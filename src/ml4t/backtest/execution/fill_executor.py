@@ -477,7 +477,11 @@ class FillExecutor:
                     self.orders.pending.remove(o)
 
         if self.journal.fill_snapshots is not None:
-            state, holdings = broker._portfolio_snapshot(include_holdings=True)
+            state, holdings, accounting = broker._portfolio_ledger.snapshot(include_holdings=True)
+            if accounting is not None:
+                snapshots = self.journal.accounting_snapshots
+                assert snapshots is not None
+                snapshots[(current_time, len(self.journal.fills) - 1)] = accounting
             if self.journal.corporate_receivable_snapshots is not None:
                 assert self.account.corporate is not None
                 self.journal.corporate_receivable_snapshots[

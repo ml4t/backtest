@@ -78,11 +78,16 @@ def validate_action_tables(
     entitlements: pl.DataFrame,
     accounts: pl.DataFrame,
     receivables: list[float],
+    *,
+    account_method: str | None = None,
 ) -> None:
     if len(receivables) != accounts.height or any(not isfinite(value) for value in receivables):
         raise ValueError("Corporate receivables require finite actual account observations")
     for row, value in zip(temporal_rows(accounts, named=True), receivables, strict=True):
-        components = row["cash"] + row["net_exposure"] + value
+        positions = (
+            row["positions_value"] if account_method == "per_instrument" else row["net_exposure"]
+        )
+        components = row["cash"] + positions + value
         if abs(row["equity"] - components) > max(1e-9, abs(row["equity"]) * 1e-14):
             raise ValueError("Account NAV does not reconcile with cash, holdings and receivables")
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}

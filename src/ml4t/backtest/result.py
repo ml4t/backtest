@@ -36,6 +36,13 @@ from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
 from ._action_artifacts import action_digest, action_frame, validate_action_tables
+from ._futures_artifacts import (
+    ACCOUNTING_COLUMNS,
+    futures_payload,
+    settlement_frame,
+    validate_futures_tables,
+    validate_instrument_accounting,
+)
 from ._temporal import temporal_frame, temporal_rows, timestamp_dtype
 
 try:
@@ -45,6 +52,7 @@ except ImportError:  # pragma: no cover - fallback for local editable edge cases
 from .analytics.annualization import should_session_align
 from .benchmark import _validate_benchmark_frame, _validate_benchmark_metadata
 from .capital import CapitalChange, flow_adjusted_returns
+from .controls import AccountControlContext
 from .funding import FundingPayment
 from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
 
@@ -57,6 +65,7 @@ _ARTIFACT_TYPE = "ml4t-backtest-result"
 _ARTIFACT_SCHEMA_VERSION = 3
 _BENCHMARK_ARTIFACT_SCHEMA_VERSION = 4
 _ACTION_ARTIFACT_SCHEMA_VERSION = 5
+_FUTURES_ARTIFACT_SCHEMA_VERSION = 6
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -74,6 +83,7 @@ _COMPONENT_FILES = {
     "benchmark": "benchmark.parquet",
     "corporate_actions": "corporate_actions.parquet",
     "corporate_entitlements": "corporate_entitlements.parquet",
+    "futures_settlements": "futures_settlements.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -267,6 +277,15 @@ class BacktestResult:
     corporate_actions: list[dict[str, Any]] | None = None
     corporate_entitlements: list[dict[str, Any]] | None = None
     corporate_receivables: list[float] | None = None
+    instrument_accounting: dict[str, dict[str, Any]] | None = None
+    accounting_observations: list[AccountControlContext] | None = None
+    futures_settlements: list[dict[str, Any]] | None = None
+
+    def to_futures_settlements_dataframe(self) -> pl.DataFrame:
+        """Return actual mark, scheduled and closing variation transfers, excluding fees."""
+        if self.futures_settlements is None:
+            raise ValueError("Result has no captured futures variation ledger")
+        return settlement_frame(self.futures_settlements)
 
     def to_actions_dataframe(self) -> pl.DataFrame:
         """Return actual account/order action applications, including cash movements."""
@@ -633,6 +652,19 @@ class BacktestResult:
             self._portfolio_state_df = self._portfolio_state_df.with_columns(
                 pl.Series("receivables_value", self.corporate_receivables, dtype=pl.Float64)
             )
+        if self.accounting_observations is not None:
+            if len(self.accounting_observations) != frame.height:
+                raise ArtifactError("Futures accounting must match actual account observations")
+            self._portfolio_state_df = self._portfolio_state_df.with_columns(
+                *(
+                    pl.Series(
+                        name,
+                        [getattr(row, name) for row in self.accounting_observations],
+                        dtype=dtype,
+                    )
+                    for name, dtype in ACCOUNTING_COLUMNS.items()
+                )
+            )
         return self._portfolio_state_df
 
     def to_holdings_dataframe(self) -> pl.DataFrame:
@@ -943,6 +975,9 @@ class BacktestResult:
                 "portfolio_state": self.portfolio_state,
                 "initial_capital": self.initial_capital,
                 "account_method": self.account_method,
+                "instrument_accounting": self.instrument_accounting,
+                "accounting_observations": self.accounting_observations,
+                "futures_settlements": self.futures_settlements,
                 "holdings": self.holdings,
                 "holdings_sampling": self.holdings_sampling,
                 "observation_metadata": self.observation_metadata,
@@ -975,6 +1010,7 @@ class BacktestResult:
             "library_version": __version__,
             "initial_capital": self.initial_capital,
             "account_method": self.account_method,
+            "instrument_accounting": self.instrument_accounting,
             "returns_include_commissions": self.returns_include_commissions,
             "lifecycle_version": self.metrics.get("lifecycle_version"),
             "lifecycle_callback_counts": self.metrics.get("lifecycle_callback_counts", {}),
@@ -1053,8 +1089,10 @@ class BacktestResult:
             ArtifactWriteError: If a requested component is unavailable or cannot be written.
         """
         explicitly_selected = include is not None
-        if self.account_method not in (None, "signed_notional"):
+        if self.account_method not in (None, "signed_notional", "per_instrument"):
             raise ArtifactWriteError("Unknown account_method")
+        if (self.account_method == "per_instrument") != (self.instrument_accounting is not None):
+            raise ArtifactWriteError("Per-instrument account requires instrument declarations")
         if self.holdings_sampling not in ("none", "bar", "session", "fill_and_session"):
             raise ArtifactWriteError("Unknown holdings_sampling")
         if self.holdings is not None:
@@ -1082,6 +1120,8 @@ class BacktestResult:
             unavailable["corporate_actions"] = "corporate-action applications were not captured"
         if self.corporate_entitlements is None:
             unavailable["corporate_entitlements"] = "corporate entitlements were not captured"
+        if self.futures_settlements is None:
+            unavailable["futures_settlements"] = "futures variation was not captured"
         if self.config is None:
             unavailable["config"] = "result has no config"
             unavailable["spec"] = "result has no config for a runtime spec"
@@ -1092,6 +1132,23 @@ class BacktestResult:
             raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
 
         selected = [name for name in requested if name not in unavailable]
+        futures_hash = None
+        if self.instrument_accounting is not None:
+            try:
+                settlement_table = self.to_futures_settlements_dataframe()
+                account_table = self.to_portfolio_state_dataframe()
+                validate_futures_tables(
+                    self.instrument_accounting, account_table, settlement_table, self.fills
+                )
+                futures_hash = sha256(
+                    futures_payload(
+                        self.instrument_accounting, account_table, settlement_table
+                    ).encode()
+                ).hexdigest()
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactWriteError(f"Invalid futures variation ledger: {exc}") from exc
+        elif self.futures_settlements is not None or self.accounting_observations is not None:
+            raise ArtifactWriteError("Futures observations require per-instrument declarations")
         corporate_hash = None
         if self.corporate_actions is not None:
             try:
@@ -1106,6 +1163,7 @@ class BacktestResult:
                     entitlements_frame,
                     self.to_portfolio_state_dataframe(),
                     self.corporate_receivables,
+                    account_method=self.account_method,
                 )
                 corporate_hash = action_digest(
                     actions_frame, entitlements_frame, self.corporate_receivables
@@ -1326,13 +1384,17 @@ class BacktestResult:
             )
             written[name] = component_path
 
-        for component in ("corporate_actions", "corporate_entitlements"):
+        for component in ("corporate_actions", "corporate_entitlements", "futures_settlements"):
             if component in selected:
                 target = path / _COMPONENT_FILES[component]
                 frame = (
                     self.to_actions_dataframe()
                     if component == "corporate_actions"
-                    else self.to_entitlements_dataframe()
+                    else (
+                        self.to_entitlements_dataframe()
+                        if component == "corporate_entitlements"
+                        else self.to_futures_settlements_dataframe()
+                    )
                 )
                 write_component(
                     component,
@@ -1344,12 +1406,24 @@ class BacktestResult:
 
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
-            "schema_version": _ACTION_ARTIFACT_SCHEMA_VERSION
-            if self.corporate_actions is not None
+            "schema_version": _FUTURES_ARTIFACT_SCHEMA_VERSION
+            if self.instrument_accounting is not None
             else (
-                _BENCHMARK_ARTIFACT_SCHEMA_VERSION
-                if self.benchmark is not None
-                else _ARTIFACT_SCHEMA_VERSION
+                _ACTION_ARTIFACT_SCHEMA_VERSION
+                if self.corporate_actions is not None
+                else (
+                    _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+                    if self.benchmark is not None
+                    else _ARTIFACT_SCHEMA_VERSION
+                )
+            ),
+            **(
+                {
+                    "instrument_accounting": self.instrument_accounting,
+                    "futures_content_sha256": futures_hash,
+                }
+                if futures_hash is not None
+                else {}
             ),
             **(
                 {"corporate_action_content_sha256": corporate_hash}
@@ -1378,6 +1452,7 @@ class BacktestResult:
                 | ({"holdings"} if self.holdings_sampling != "none" else set())
                 | ({"recorded_variables"} if self.recorded_variables is not None else set())
                 | ({"benchmark"} if self.benchmark is not None else set())
+                | ({"futures_settlements"} if self.instrument_accounting is not None else set())
                 | (
                     {"corporate_actions", "corporate_entitlements"}
                     if self.corporate_actions is not None
@@ -1509,10 +1584,11 @@ class BacktestResult:
                 _ARTIFACT_SCHEMA_VERSION,
                 _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
                 _ACTION_ARTIFACT_SCHEMA_VERSION,
+                _FUTURES_ARTIFACT_SCHEMA_VERSION,
             ):
                 raise UnsupportedArtifactVersionError(
                     f"Unsupported result artifact schema version {schema_version!r}; "
-                    f"supported versions are 2, {_ARTIFACT_SCHEMA_VERSION}, {_BENCHMARK_ARTIFACT_SCHEMA_VERSION} and {_ACTION_ARTIFACT_SCHEMA_VERSION}"
+                    "supported versions are 2, 3, 4, 5 and 6"
                 )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
@@ -1553,8 +1629,19 @@ class BacktestResult:
 
         initial_capital = manifest.get("initial_capital") if manifest is not None else None
         account_method = manifest.get("account_method") if manifest else None
-        if account_method not in (None, "signed_notional"):
+        if account_method not in (None, "signed_notional", "per_instrument"):
             raise ArtifactManifestError("Unknown account_method")
+        futures_declared = manifest is not None and manifest.get("schema_version") == 6
+        instrument_accounting = manifest.get("instrument_accounting") if manifest else None
+        if futures_declared:
+            try:
+                validate_instrument_accounting(instrument_accounting)
+                if account_method != "per_instrument":
+                    raise ValueError("Futures artifacts require per-instrument accounting")
+            except ValueError as exc:
+                raise ArtifactManifestError(str(exc)) from exc
+        elif account_method == "per_instrument" or instrument_accounting is not None:
+            raise ArtifactManifestError("Per-instrument accounting requires schema version 6")
         returns_include_commissions = (
             manifest.get("returns_include_commissions") if manifest else None
         )
@@ -1588,17 +1675,22 @@ class BacktestResult:
         )
         if benchmark_declared and benchmark_metadata is None and not recovery:
             raise ArtifactManifestError("Benchmark artifact has no provenance declaration")
-        required_components = _REQUIRED_RESULT_COMPONENTS | (
-            {"benchmark"} if benchmark_declared else set()
+        required_components = (
+            _REQUIRED_RESULT_COMPONENTS
+            | ({"benchmark"} if benchmark_declared else set())
+            | ({"futures_settlements"} if futures_declared else set())
         )
-        actions_declared = (
-            manifest is not None
-            and manifest.get("schema_version") == _ACTION_ARTIFACT_SCHEMA_VERSION
+        actions_declared = manifest is not None and (
+            manifest.get("schema_version") == _ACTION_ARTIFACT_SCHEMA_VERSION
+            or futures_declared
+            and manifest.get("corporate_action_content_sha256") is not None
         )
         if actions_declared:
             required_components |= {"corporate_actions", "corporate_entitlements"}
         elif {"corporate_actions", "corporate_entitlements"} & components.keys():
             raise ArtifactManifestError("Corporate actions require schema version 5 provenance")
+        if not futures_declared and "futures_settlements" in components:
+            raise ArtifactManifestError("Futures settlements require schema version 6 provenance")
         missing_required_components = sorted(required_components - components.keys())
         missing_files = sorted(
             name for name, filename in components.items() if not (path / filename).is_file()
@@ -1620,6 +1712,7 @@ class BacktestResult:
                         "benchmark",
                         "corporate_actions",
                         "corporate_entitlements",
+                        "futures_settlements",
                     }
                 )
                 - components.keys()
@@ -1811,11 +1904,28 @@ class BacktestResult:
 
         observation_metadata: list[tuple[str, bool, int | None]] = []
         corporate_receivables: list[float] = []
+        accounting_observations: list[AccountControlContext] = []
 
         def read_portfolio_state(
             component_path: Path,
         ) -> list[tuple[datetime, float, float, float, float, int]]:
             frame = pl.read_parquet(component_path)
+            if futures_declared:
+                if not set(ACCOUNTING_COLUMNS) <= set(frame.columns):
+                    raise ValueError("Variation artifact omits actual margin observations")
+                accounting_observations.extend(
+                    AccountControlContext(
+                        row["timestamp"],
+                        row["equity"],
+                        row["cash"],
+                        row["gross_exposure"],
+                        row["net_exposure"],
+                        **{name: row[name] for name in ACCOUNTING_COLUMNS},
+                    )
+                    for row in temporal_rows(frame, named=True)
+                )
+            elif set(ACCOUNTING_COLUMNS) & set(frame.columns):
+                raise ValueError("Variation observations require schema version 6 provenance")
             if "receivables_value" in frame.columns:
                 if not actions_declared:
                     raise ValueError(
@@ -1926,8 +2036,9 @@ class BacktestResult:
             if manifest is None or manifest.get("schema_version") not in (
                 _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
                 _ACTION_ARTIFACT_SCHEMA_VERSION,
+                _FUTURES_ARTIFACT_SCHEMA_VERSION,
             ):
-                raise ValueError("Prepared benchmark requires artifact schema version 4 or 5")
+                raise ValueError("Prepared benchmark requires artifact schema version 4, 5 or 6")
             if _benchmark_digest(frame) != manifest.get("benchmark_content_sha256"):
                 raise ValueError("Prepared benchmark content does not match its retained digest")
             probe = cls(
@@ -2144,6 +2255,13 @@ class BacktestResult:
             corporate_actions = list(temporal_rows(actions_table, named=True))
             corporate_entitlements = list(temporal_rows(entitlements_table, named=True))
 
+        futures_settlements = None
+        if futures_declared:
+            settlement_table = read_component("futures_settlements", pl.read_parquet, None)
+            if settlement_table is None:
+                raise ArtifactReadError("Declared futures variation ledger is missing")
+            futures_settlements = list(temporal_rows(settlement_table, named=True))
+
         result = cls(
             trades=trades,
             equity_curve=equity_curve,
@@ -2163,6 +2281,9 @@ class BacktestResult:
             observation_metadata=observation_metadata,
             recorded_variables=recorded_variables,
             account_method=account_method,
+            instrument_accounting=instrument_accounting,
+            accounting_observations=accounting_observations if futures_declared else None,
+            futures_settlements=futures_settlements,
             benchmark=benchmark,
             benchmark_metadata=benchmark_metadata if benchmark is not None else None,
             corporate_actions=corporate_actions,
@@ -2180,6 +2301,7 @@ class BacktestResult:
                     entitlements_table,
                     result.to_portfolio_state_dataframe(),
                     corporate_receivables,
+                    account_method=account_method,
                 )
                 if manifest is None or action_digest(
                     actions_table, entitlements_table, corporate_receivables
@@ -2197,6 +2319,19 @@ class BacktestResult:
             _validate_complete_holdings(
                 result.to_portfolio_state_dataframe(), result.to_holdings_dataframe()
             )
+        if futures_declared:
+            try:
+                accounts, settlements = (
+                    result.to_portfolio_state_dataframe(),
+                    result.to_futures_settlements_dataframe(),
+                )
+                validate_futures_tables(instrument_accounting, accounts, settlements, fills)
+                if manifest is None or sha256(
+                    futures_payload(instrument_accounting, accounts, settlements).encode()
+                ).hexdigest() != manifest.get("futures_content_sha256"):
+                    raise ValueError("Futures content identity does not match its manifest")
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactReadError(f"Invalid futures variation ledger: {exc}") from exc
         return result
 
     @staticmethod

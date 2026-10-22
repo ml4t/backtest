@@ -19,7 +19,9 @@ from ml4t.backtest.config import CommissionType, ExecutionMode
 TIMES = [datetime(2025, 3, 3, 21, tzinfo=UTC) + timedelta(days=i) for i in range(4)]
 
 
-def run_future(quantity, *, mode="on_mark", settlements=None, legacy=False, runner="direct"):
+def run_future(
+    quantity, *, mode="on_mark", settlements=None, legacy=False, runner="direct", sampling="bar"
+):
     reads = []
 
     class Buy(Strategy):
@@ -42,7 +44,7 @@ def run_future(quantity, *, mode="on_mark", settlements=None, legacy=False, runn
         {"timestamp": TIMES, "asset": ["ES"] * 4, "close": [4000.0, 4000.0, 4010.0, 4010.0]}
     )
     config = BacktestConfig(
-        calendar=None,
+        calendar="NYSE" if sampling in {"session", "fill_and_session"} else None,
         initial_cash=100000,
         allow_leverage=True,
         allow_short_selling=True,
@@ -60,7 +62,7 @@ def run_future(quantity, *, mode="on_mark", settlements=None, legacy=False, runn
                 Buy(),
                 config=config,
                 contract_specs={"ES": spec},
-                holdings_sampling="bar",
+                holdings_sampling=sampling,
                 **kwargs,
             ),
             reads,
@@ -71,10 +73,32 @@ def run_future(quantity, *, mode="on_mark", settlements=None, legacy=False, runn
         Buy(),
         config,
         contract_specs={"ES": spec},
-        holdings_sampling="bar",
+        holdings_sampling=sampling,
         **kwargs,
     )
     return engine, engine.run(), reads
+
+
+@pytest.mark.parametrize("sampling", ["none", "bar", "session", "fill_and_session"])
+def test_variation_artifact_retains_liquidation_margin_and_actual_payouts(tmp_path, sampling):
+    from ml4t.backtest import BacktestResult
+
+    _, result, _ = run_future(1, sampling=sampling)
+    assert result.account_method == "per_instrument"
+    accounts = result.to_portfolio_state_dataframe()
+    assert accounts["positions_value"].to_list() == [0] * accounts.height
+    assert accounts["initial_margin_required"][-1] == 15000
+    assert accounts["maintenance_margin_required"][-1] == 12000
+    assert accounts["available_funds"][-1] == 85498
+    assert accounts["net_exposure"][-1] == 200500
+    settlements = result.to_futures_settlements_dataframe()
+    assert settlements["cash_delta"].sum() == 500
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.account_method == "per_instrument"
+    assert restored.instrument_accounting == result.instrument_accounting
+    assert restored.to_portfolio_state_dataframe().equals(accounts)
+    assert restored.to_futures_settlements_dataframe().equals(settlements)
 
 
 @pytest.mark.parametrize("quantity", [1, -1])
@@ -381,7 +405,11 @@ def test_settlement_price_is_a_cash_transfer_basis_and_does_not_invent_a_tradabl
     assert result.to_holdings_dataframe()["liquidation_value"][-1] == -250
 
 
-def test_unpaid_dividend_cannot_finance_future_margin_before_its_actual_payment():
+def test_unpaid_dividend_cannot_finance_future_margin_before_its_actual_payment(tmp_path):
+    from ml4t.specs import FeedSpec
+
+    from ml4t.backtest import BacktestResult, BenchmarkData
+
     snapshots, attempts = [], []
 
     class Buy(Strategy):
@@ -444,7 +472,12 @@ def test_unpaid_dividend_cannot_finance_future_margin_before_its_actual_payment(
         },
     }
     engine = Engine(
-        DataFeed(prices_df=prices, corporate_actions=events, input_manifest={"price_basis": "raw"}),
+        DataFeed(
+            prices_df=prices,
+            corporate_actions=events,
+            input_manifest={"price_basis": "raw"},
+            feed_spec=FeedSpec(timestamp_semantics="event_time"),
+        ),
         Buy(),
         BacktestConfig(
             calendar=None,
@@ -459,6 +492,13 @@ def test_unpaid_dividend_cannot_finance_future_margin_before_its_actual_payment(
         ),
         contract_specs=specs,
         holdings_sampling="bar",
+        benchmark=BenchmarkData(
+            pl.DataFrame({"timestamp": TIMES, "return": [0.0, 0.01, 0.0, -0.01]}),
+            source_id="declared-example-index",
+            return_method="close_to_close",
+            reinvestment="none",
+            feed_spec=FeedSpec(timestamp_semantics="event_time"),
+        ),
     )
     result = engine.run()
     assert [row.available_funds for row in snapshots] == [84991, 85001]
@@ -467,3 +507,74 @@ def test_unpaid_dividend_cannot_finance_future_margin_before_its_actual_payment(
         TIMES[3]
     ]
     assert result.to_equity_dataframe()["equity"].to_list()[-1] == 100494
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.to_portfolio_state_dataframe().equals(result.to_portfolio_state_dataframe())
+    assert restored.to_actions_dataframe().equals(result.to_actions_dataframe())
+    assert restored.to_futures_settlements_dataframe().equals(
+        result.to_futures_settlements_dataframe()
+    )
+    assert restored.to_benchmark_dataframe().equals(result.to_benchmark_dataframe())
+
+
+def test_failing_callback_removes_its_future_payout_and_fill_observation_only():
+    class Fail(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            broker.submit_order("ES", 1 if timestamp == TIMES[0] else -1)
+            if timestamp == TIMES[1]:
+                raise RuntimeError("callback failed")
+
+    engine = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": TIMES[:2],
+                    "asset": ["ES"] * 2,
+                    "close": [4000.0, 4010.0],
+                }
+            )
+        ),
+        Fail(),
+        BacktestConfig(
+            calendar="NYSE",
+            allow_leverage=True,
+            initial_cash=100000,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            commission_rate=0,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            "ES": ContractSpec(
+                "ES",
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin=15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+        },
+        holdings_sampling="fill_and_session",
+    )
+    with pytest.raises(RuntimeError, match="callback failed"):
+        engine.run()
+    assert engine.broker.cash == 100500
+    assert engine.broker.get_position("ES").quantity == 1
+    assert len(engine.broker.fills) == 1
+    assert [row["phase"] for row in engine._futures_ledger.records] == ["before_callbacks"]
+    journal = engine.broker._execution_journal
+    assert set(journal.accounting_snapshots) == {(TIMES[0], 0), (TIMES[0], None)}
+
+
+def test_portable_future_payout_rejects_changed_cash_amount(tmp_path):
+    from ml4t.backtest import BacktestResult
+    from ml4t.backtest.result import ArtifactReadError
+
+    _, result, _ = run_future(1)
+    result.to_parquet(tmp_path)
+    path = tmp_path / "futures_settlements.parquet"
+    pl.read_parquet(path).with_columns(
+        (pl.col("cash_delta") + 1).alias("cash_delta")
+    ).write_parquet(path)
+    with pytest.raises(ArtifactReadError, match="cash does not match"):
+        BacktestResult.from_parquet(tmp_path)

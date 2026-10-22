@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import polars as pl
 import pytest
 
-from ml4t.backtest import AssetClass, ContractSpec, DataFeed
+from ml4t.backtest import AssetClass, BacktestResult, ContractSpec, DataFeed
 from ml4t.backtest.compat.zipline import PreparedAssetLookup, run_algorithm
 from ml4t.backtest.compat.zipline.finance import commission, slippage
 
@@ -40,7 +40,7 @@ def snapshot(actual=False):
 
 @pytest.mark.parametrize("actual", [False, True], ids=["captured", "installed-data"])
 @pytest.mark.parametrize("case", REFERENCE["cases"], ids=lambda c: c["name"])
-def test_original_future_variation_cash_closing_basis_positions_and_fills(case, actual):
+def test_original_future_variation_cash_closing_basis_positions_and_fills(case, actual, tmp_path):
     captured = snapshot(actual)
     lookup = PreparedAssetLookup(captured)
     future = lookup.assets[0]
@@ -119,6 +119,7 @@ def test_original_future_variation_cash_closing_basis_positions_and_fills(case, 
     )
     assert performance["cash"].to_list() == case["cash"]
     assert performance["portfolio_value"].to_list() == case["nav"]
+    assert performance["positions_value"].to_list() == [0] * len(case["nav"])
     assert trace == case["trace"]
     fills = [
         {
@@ -131,3 +132,10 @@ def test_original_future_variation_cash_closing_basis_positions_and_fills(case, 
         for fill in transactions
     ]
     assert fills == case["fills"]
+    result = performance.attrs["backtest_result"]
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.to_portfolio_state_dataframe().equals(result.to_portfolio_state_dataframe())
+    assert restored.to_futures_settlements_dataframe().equals(
+        result.to_futures_settlements_dataframe()
+    )

@@ -59,10 +59,22 @@ def _performance(
         {
             "portfolio_value": [row["equity"] for row in rows],
             "cash": [row["cash"] for row in rows],
+            "positions_value": [row.get("positions_value", row["net_exposure"]) for row in rows],
             "returns": result.to_returns_series().to_list(),
         },
         index=index.tz_convert("UTC").as_unit("ns"),
     )
+    if result.instrument_accounting is not None:
+        for name in (
+            "initial_margin_required",
+            "maintenance_margin_required",
+            "available_funds",
+            "futures_unsettled_pnl",
+            "settlement_holds",
+            "cash_buffer",
+            "margin_breach",
+        ):
+            performance[name] = [row[name] for row in rows]
     if result.benchmark is not None:
         benchmark = result.to_benchmark_dataframe()
         benchmark_index = pd.DatetimeIndex(timestamp_values(benchmark["timestamp"])).as_unit("ns")

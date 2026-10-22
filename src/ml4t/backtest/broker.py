@@ -573,6 +573,7 @@ class Broker:
                 raise ValueError("settlement_events require declared futures_variation instruments")
             return None
         self._execution_journal.futures_settlements = []
+        self._execution_journal.accounting_snapshots = {}
         return FuturesLedger(
             self, events, timestamps, account=self.account, journal=self._execution_journal
         )
@@ -594,8 +595,25 @@ class Broker:
         )
         return state, holdings
 
+    def _accounting_observations(self, account, metadata):
+        snapshots = self._execution_journal.accounting_snapshots
+        if snapshots is None:
+            return None
+        return [
+            snapshots[(row[0], observation[2])]
+            for row, observation in zip(
+                account, metadata or [("bar", False, None)] * len(account), strict=True
+            )
+        ]
+
     def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
-        state = self._portfolio_snapshot(include_holdings=include_holdings)
+        account, holdings, accounting = self._portfolio_ledger.snapshot(
+            include_holdings=include_holdings
+        )
+        if accounting is not None:
+            snapshots = self._execution_journal.accounting_snapshots
+            assert snapshots is not None
+            snapshots[(timestamp, None)] = accounting
         receivables = self._execution_journal.corporate_receivable_snapshots
         if receivables is not None:
             corporate = self.account.corporate
@@ -606,7 +624,7 @@ class Broker:
             rows = self._execution_journal.recorded_rows
             assert rows is not None
             rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
-        return state
+        return account, holdings
 
     def _observed_fill_accounts(self):
         return tuple(self._execution_journal.fill_snapshots or ())
@@ -1058,6 +1076,10 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "futures_settlements_length": len(self._execution_journal.futures_settlements or []),
+            "accounting_snapshots": dict(self._execution_journal.accounting_snapshots)
+            if self._execution_journal.accounting_snapshots is not None
+            else None,
             "completed_entitlements_length": len(
                 self._execution_journal.completed_corporate_entitlements or []
             ),
@@ -1196,6 +1218,9 @@ class Broker:
         ]
         if self._execution_journal.fill_snapshots is not None:
             del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
+        if self._execution_journal.futures_settlements is not None:
+            del self._execution_journal.futures_settlements[state["futures_settlements_length"] :]
+        self._execution_journal.accounting_snapshots = state["accounting_snapshots"]
 
         self._rebalance_counter = state["rebalance_counter"]
         if state["all_asset_stats"]:

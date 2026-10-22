@@ -132,6 +132,8 @@ class PortfolioLedger:
                 maintenance_margin_required=maintenance_margin,
                 available_funds=equity - receivables - initial_margin - holds - buffer,
                 futures_unsettled_pnl=unsettled,
+                settlement_holds=holds,
+                cash_buffer=buffer,
                 margin_breach=equity < maintenance_margin,
             )
         return (

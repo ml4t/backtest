@@ -979,6 +979,28 @@ class Engine:
         action_receivables = self.broker._corporate_receivable_observations(
             observed_account, observation_metadata
         )
+        accounting_observations = self.broker._accounting_observations(
+            observed_account, observation_metadata
+        )
+        instrument_accounting = (
+            {
+                asset: {
+                    "accounting_method": "futures_variation",
+                    "settlement_policy": mode,
+                    "currency": self.broker._get_contract_currency(asset),
+                    "multiplier": self.broker.get_multiplier(asset),
+                }
+                for asset, mode in self.broker.account.futures_methods.items()
+            }
+            if self.broker.account.futures_methods is not None
+            else None
+        )
+        futures_settlements = (
+            deepcopy(self._futures_ledger.records) if self._futures_ledger is not None else None
+        )
+        account_method = (
+            "per_instrument" if instrument_accounting is not None else "signed_notional"
+        )
 
         if not self.equity_curve:
             # Return empty result for no-data case
@@ -1001,7 +1023,10 @@ class Engine:
                 config=deepcopy(self.config),
                 initial_capital=self.config.initial_cash,
                 returns_include_commissions=True,
-                account_method="signed_notional",
+                account_method=account_method,
+                instrument_accounting=instrument_accounting,
+                accounting_observations=accounting_observations,
+                futures_settlements=futures_settlements,
                 holdings=observed_holdings,
                 observation_metadata=observation_metadata,
                 recorded_variables=self.broker._recorded_variables(),
@@ -1141,7 +1166,10 @@ class Engine:
             config=deepcopy(self.config),
             initial_capital=self.config.initial_cash,
             returns_include_commissions=True,
-            account_method="signed_notional",
+            account_method=account_method,
+            instrument_accounting=instrument_accounting,
+            accounting_observations=accounting_observations,
+            futures_settlements=futures_settlements,
             holdings=observed_holdings,
             observation_metadata=observation_metadata,
             recorded_variables=self.broker._recorded_variables(),
