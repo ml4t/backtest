@@ -137,6 +137,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev --locked
 
+      - name: Install qualified optional producer and analysis integrations
+        run: uv pip install --python .venv/bin/python -r validation/successor-integration-requirements.txt
+
       - name: Run branch coverage suite
         run: >-
           uv run pytest tests/ -q -m "not benchmark"

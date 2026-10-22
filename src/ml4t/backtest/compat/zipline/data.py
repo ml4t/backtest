@@ -327,10 +327,15 @@ class BarData:
             return result[names[0]]
         return result
 
+    def _continuous_source(self, handle: ContinuousFuture) -> PreparedFutures:
+        source = self._futures.get(handle)
+        if source is None or source.handle.query != handle.query:
+            raise ValueError("Continuous query must match its registered PreparedFutures source")
+        return source
+
     def _continuous_state(self, handle: ContinuousFuture) -> tuple[Future | None, list[Future]]:
         self._runtime.market._check_active()
-        if handle not in self._futures:
-            raise ValueError("Continuous handle requires its registered PreparedFutures source")
+        source = self._continuous_source(handle)
         market = self._runtime.market
         cached = self._futures_cache.get(handle)
         if cached is None or cached[:2] != (market._asof, market._inclusive):
@@ -339,7 +344,7 @@ class BarData:
             if cutoff.tz is None:
                 assert self._runtime._engine is not None
                 cutoff = cutoff.tz_localize(self._runtime._engine.config.resolved_timezone)
-            state = self._futures[handle].at(cutoff, before_observation=not market._inclusive)
+            state = source.at(cutoff, before_observation=not market._inclusive)
             cached = (market._asof, market._inclusive, state)
             self._futures_cache[handle] = cached
         return cached[2]
@@ -387,14 +392,10 @@ class BarData:
         assert engine is not None
         market = self._runtime.market
         source = self._history_sources.get(frequency)
-        if any(isinstance(asset, ContinuousFuture) for asset in chosen) and (
-            source is None
-            or any(
-                asset not in self._futures
-                for asset in chosen
-                if isinstance(asset, ContinuousFuture)
-            )
-        ):
+        continuous = [asset for asset in chosen if isinstance(asset, ContinuousFuture)]
+        for asset in continuous:
+            self._continuous_source(asset)
+        if continuous and source is None:
             raise ValueError(
                 "Continuous history requires registered handles and a named Data history source"
             )

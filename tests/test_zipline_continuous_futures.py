@@ -266,6 +266,33 @@ def test_research_history_key_requires_explicit_read_only_declaration():
         RuntimeServices(history_assets={"unknown": ["research:TEST"]})
 
 
+@pytest.mark.parametrize("read", ["current", "current_chain", "history"])
+def test_same_key_cannot_silently_substitute_an_unregistered_continuous_query(read):
+    feed, assets, source = _inputs()
+    wrong = replace(source.handle, offset=1)
+    orders = []
+
+    def handle(context, data):
+        if read == "history":
+            data.history(wrong, "price", 2, "1d")
+        elif read == "current":
+            data.current(wrong, "contract")
+        else:
+            data.current_chain(wrong)
+        orders.append(context.order(assets[17], 1))
+
+    with pytest.raises(ValueError, match="query"):
+        run_algorithm(
+            feed=feed,
+            assets=list(assets.values()),
+            continuous_futures=[source],
+            initialize=_no_fees,
+            handle_data=handle,
+            runtime=RuntimeServices(start=TIMES[1]),
+        )
+    assert not orders
+
+
 def test_actual_data_normalized_units_cannot_be_replaced_by_wrong_declared_contract_size():
     feed, assets, source = _inputs()
     wrong = {identity: replace(asset, multiplier=25) for identity, asset in assets.items()}
