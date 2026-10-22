@@ -1,0 +1,312 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "source_revision": "cf649ac06fddce76f6caa2403cd8494ac84f72ad",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "calendar": "us_futures",
+  "timing_claim": false,
+  "cases": [
+    {
+      "name": "calendar",
+      "trace": [
+        {
+          "timestamp": "2025-07-07T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4000.0,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4010.0,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-09T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4020.0,
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4040.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4030.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-11T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4050.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-14T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4060.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "sid": 17,
+          "quantity": 1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "sid": 17,
+          "quantity": -1.0,
+          "price": 4030.0
+        }
+      ]
+    },
+    {
+      "name": "volume",
+      "trace": [
+        {
+          "timestamp": "2025-07-07T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4000.0,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4010.0,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-09T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4030.0,
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4040.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4030.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-11T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4050.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-14T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4060.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "sid": 17,
+          "quantity": 1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "sid": 17,
+          "quantity": -1.0,
+          "price": 4030.0
+        }
+      ]
+    },
+    {
+      "name": "expiry",
+      "trace": [
+        {
+          "timestamp": "2025-07-07T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4000.0,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4010.0,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-09T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4020.0,
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4040.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4030.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-11T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4050.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-14T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4060.0,
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "sid": 17,
+          "quantity": 1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "sid": 17,
+          "quantity": -1.0,
+          "price": 4030.0
+        }
+      ]
+    }
+  ]
+}
