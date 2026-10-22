@@ -11,7 +11,7 @@ from ml4t.specs import FeedSpec
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
 from ml4t.backtest.config import ExecutionMode
 from ml4t.backtest.controls import TradingControlViolation
-from ml4t.backtest.types import OrderStatus, OrderType
+from ml4t.backtest.types import ContractSpec, OrderStatus, OrderType
 
 ROOT = Path(__file__).parent / "fixtures" / "prepared_instruments"
 MANIFEST = json.loads((ROOT / "manifest.json").read_text())
@@ -79,6 +79,58 @@ def _feed(frame=None):
 class Noop(Strategy):
     def on_data(self, timestamp, data, context, broker):
         pass
+
+
+@pytest.mark.parametrize("actual", [False, True], ids=["captured", "installed-data"])
+def test_effective_cash_conversion_removes_expiring_holdings_before_require_flat_validation(actual):
+    source, spec = _source(actual=actual)
+    runtime = RuntimeServices(
+        instruments=source, instrument_feed_spec=spec, inactive_position_policy="require_flat"
+    )
+    times = _times()
+    feed = _feed()
+    feed.corporate_actions = pl.DataFrame(
+        [
+            {
+                "source": "declared-conversion",
+                "event_id": "old-cash",
+                "revision_id": "r1",
+                "asset": "OLD",
+                "action_kind": "merger",
+                "currency": "USD",
+                "available_at": times[0],
+                "effective_at": times[2],
+                "payment_at": times[2],
+                "share_basis": "pre_event",
+                "quantity_ratio": 0.0,
+                "cash_component": 110.0,
+            }
+        ]
+    )
+    feed.input_manifest = {"price_basis": "raw"}
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("OLD", 1)
+            if timestamp == times[2]:
+                assert broker.get_position("OLD") is None
+                assert broker.cash == 1010
+
+    result = Engine(
+        feed,
+        Buy(),
+        BacktestConfig(
+            initial_cash=1000,
+            calendar=None,
+            commission_rate=0,
+            slippage_rate=0,
+            execution_mode=ExecutionMode.SAME_BAR,
+        ),
+        runtime=runtime,
+        contract_specs={"OLD": ContractSpec("OLD")},
+    ).run()
+    assert result.to_equity_dataframe()["equity"].to_list() == [1000, 1010, 1010, 1010]
 
 
 @pytest.mark.parametrize("actual", [False, True], ids=["captured", "installed-data"])

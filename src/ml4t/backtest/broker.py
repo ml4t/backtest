@@ -48,6 +48,7 @@ from .execution.fill_executor import FillExecutor
 from .funding import FundingEvent, FundingPayment
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
+    AssetClass,
     AssetTradingStats,
     ContractSpec,
     ExecutionMode,
@@ -222,6 +223,15 @@ class Broker:
                     effective_margin_pct_schedule[symbol] = spec.margin_pct
 
         # Create AccountState with UnifiedAccountPolicy
+        futures_methods = {
+            asset: spec.settlement_policy
+            for asset, spec in (contract_specs or {}).items()
+            if spec.accounting_method == "futures_variation"
+        }
+        if futures_methods and not allow_leverage:
+            raise ValueError("futures_variation requires a margin-enabled account")
+        if futures_methods and len({spec.currency for spec in (contract_specs or {}).values()}) > 1:
+            raise ValueError("A single cash variation account requires the same declared currency")
         policy: AccountPolicy = UnifiedAccountPolicy(
             allow_short_selling=allow_short_selling,
             allow_leverage=allow_leverage,
@@ -231,9 +241,11 @@ class Broker:
             fixed_margin_schedule=effective_margin_schedule or None,
             margin_pct_schedule=effective_margin_pct_schedule or None,
             short_cash_policy=short_cash_policy.value,
+            variation_assets=frozenset(futures_methods),
         )
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
+        self.account.futures_methods = futures_methods or None
         # Derive account_type string from flags for backward compat
         if allow_leverage:
             self.account_type = "margin"
@@ -538,17 +550,90 @@ class Broker:
         if after_fill:
             self._execution_journal.fill_snapshots = []
 
-    def _portfolio_snapshot(self, *, include_holdings: bool):
-        return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
+    def _create_corporate_action_ledger(self, frame, manifest, config, timestamps):
+        from .corporate_actions import CorporateActionLedger
+
+        ledger = CorporateActionLedger(
+            frame,
+            manifest,
+            config,
+            self,
+            timestamps,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            journal=self._execution_journal,
+        )
+        self._execution_journal.corporate_receivable_snapshots = {}
+        self._market_state.last_price_times = {}
+        return ledger
+
+    def _create_futures_ledger(self, events, timestamps):
+        from .futures import FuturesLedger
+
+        if self.account.futures_methods is None:
+            if events is not None:
+                raise ValueError("settlement_events require declared futures_variation instruments")
+            return None
+        self._execution_journal.futures_settlements = []
+        self._execution_journal.accounting_snapshots = {}
+        return FuturesLedger(
+            self, events, timestamps, account=self.account, journal=self._execution_journal
+        )
+
+    def _corporate_receivable_observations(self, account, metadata):
+        snapshots = self._execution_journal.corporate_receivable_snapshots
+        if snapshots is None:
+            return None
+        return [
+            snapshots[(row[0], observation[2])]
+            for row, observation in zip(
+                account, metadata or [("bar", False, None)] * len(account), strict=True
+            )
+        ]
+
+    def _portfolio_snapshot(
+        self, *, include_holdings: bool, observation_key: tuple[datetime, int] | None = None
+    ):
+        state, holdings, accounting = self._portfolio_ledger.snapshot(
+            include_holdings=include_holdings
+        )
+        if observation_key is not None and accounting is not None:
+            snapshots = self._execution_journal.accounting_snapshots
+            assert snapshots is not None
+            snapshots[observation_key] = accounting
+        return state, holdings
+
+    def _accounting_observations(self, account, metadata):
+        snapshots = self._execution_journal.accounting_snapshots
+        if snapshots is None:
+            return None
+        return [
+            snapshots[(row[0], observation[2])]
+            for row, observation in zip(
+                account, metadata or [("bar", False, None)] * len(account), strict=True
+            )
+        ]
 
     def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
-        state = self._portfolio_snapshot(include_holdings=include_holdings)
+        account, holdings, accounting = self._portfolio_ledger.snapshot(
+            include_holdings=include_holdings
+        )
+        if accounting is not None:
+            snapshots = self._execution_journal.accounting_snapshots
+            assert snapshots is not None
+            snapshots[(timestamp, None)] = accounting
+        receivables = self._execution_journal.corporate_receivable_snapshots
+        if receivables is not None:
+            corporate = self.account.corporate
+            assert corporate is not None
+            receivables[(timestamp, None)] = corporate.receivable_value
         recorded = self._execution_journal.recorded_values
         if recorded is not None:
             rows = self._execution_journal.recorded_rows
             assert rows is not None
             rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
-        return state
+        return account, holdings
 
     def _observed_fill_accounts(self):
         return tuple(self._execution_journal.fill_snapshots or ())
@@ -1000,6 +1085,24 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "futures_submission_state": self._order_book.snapshot_submission_state()
+            if self.account.futures_methods is not None
+            else None,
+            "futures_settlements_length": len(self._execution_journal.futures_settlements or []),
+            "futures_roll_intents_length": len(self._execution_journal.futures_roll_intents or []),
+            "futures_roll_intents_enabled": self._execution_journal.futures_roll_intents
+            is not None,
+            "accounting_snapshots": dict(self._execution_journal.accounting_snapshots)
+            if self._execution_journal.accounting_snapshots is not None
+            else None,
+            "completed_entitlements_length": len(
+                self._execution_journal.completed_corporate_entitlements or []
+            ),
+            "corporate_receivable_snapshots": dict(
+                self._execution_journal.corporate_receivable_snapshots
+            )
+            if self._execution_journal.corporate_receivable_snapshots is not None
+            else None,
             "rebalance_counter": self._rebalance_counter,
             "original_asset_stats_keys": set(self._asset_stats),
             "asset_stats": {},
@@ -1121,8 +1224,24 @@ class Broker:
             del self._execution_journal.recorded_rows[state["recorded_length"] :]
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
+        if self._execution_journal.completed_corporate_entitlements is not None:
+            del self._execution_journal.completed_corporate_entitlements[
+                state["completed_entitlements_length"] :
+            ]
+        self._execution_journal.corporate_receivable_snapshots = state[
+            "corporate_receivable_snapshots"
+        ]
         if self._execution_journal.fill_snapshots is not None:
             del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
+        if self._execution_journal.futures_settlements is not None:
+            del self._execution_journal.futures_settlements[state["futures_settlements_length"] :]
+        self._execution_journal.accounting_snapshots = state["accounting_snapshots"]
+        if not state["futures_roll_intents_enabled"]:
+            self._execution_journal.futures_roll_intents = None
+        elif self._execution_journal.futures_roll_intents is not None:
+            del self._execution_journal.futures_roll_intents[state["futures_roll_intents_length"] :]
+        if state["futures_submission_state"] is not None:
+            self._order_book.restore_submission_state(state["futures_submission_state"])
 
         self._rebalance_counter = state["rebalance_counter"]
         if state["all_asset_stats"]:
@@ -1373,6 +1492,11 @@ class Broker:
         use_open: bool = False,
     ) -> float | None:
         """Resolve a finite configured mark, returning None when unavailable."""
+        corporate = self.account.corporate
+        if corporate is not None:
+            adjusted = corporate.marks.get(asset)
+            if adjusted is not None:
+                return adjusted[0 if quantity is not None and quantity > 0 else 1]
         mark_side = None
         if self.mark_price == ExecutionPrice.QUOTE_SIDE and quantity is not None:
             mark_side = OrderSide.SELL if quantity > 0 else OrderSide.BUY
@@ -1638,9 +1762,11 @@ class Broker:
 
     def get_account_snapshot(self) -> AccountControlContext:
         """Return one immutable, currently marked native account observation."""
-        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
+        (equity, cash, gross, net, _), _holdings, accounting = self._portfolio_ledger.snapshot(
             include_holdings=False
         )
+        if accounting is not None:
+            return accounting
         return AccountControlContext(
             self._market_state.time, equity, cash, gross, net, positions_value=net
         )
@@ -2149,6 +2275,137 @@ class Broker:
             trail_amount=trail_amount,
             options=_options,
         )
+
+    def roll_position(
+        self,
+        old_asset: str,
+        new_asset: str,
+        *,
+        roll_id: str,
+        decision_at: datetime | None = None,
+        available_at: datetime | None = None,
+        new_quantity: float | None = None,
+        selection: Mapping[str, Any] | None = None,
+    ) -> tuple[Order | None, Order | None]:
+        """Submit paired non-atomic market legs, retaining actual outcomes under one ID.
+
+        The current execution mode and ordinary order controls remain effective. A
+        filled close does not guarantee a filled open. Repeating an unchanged roll
+        ID returns its existing orders. Declared selection clocks must be causal;
+        raw execution quotes still come exclusively from the feed.
+        """
+        from .corporate_actions import action_terms_json
+
+        now = self._market_state.time
+        if now is None:
+            raise ValueError("A futures roll requires an active market clock")
+        if not isinstance(roll_id, str) or not roll_id.strip():
+            raise ValueError("A futures roll requires a nonempty roll_id")
+        if old_asset == new_asset:
+            raise ValueError("Roll legs require distinct contracts")
+        specs = [self.get_contract_spec(asset) for asset in (old_asset, new_asset)]
+        if any(spec is None or spec.asset_class is not AssetClass.FUTURE for spec in specs):
+            raise ValueError("Both roll legs require declared FUTURE ContractSpecs")
+        old_spec, new_spec = specs
+        assert old_spec is not None and new_spec is not None
+        if old_spec.currency != new_spec.currency:
+            raise ValueError("Roll contract currencies must agree; FX is not implicit")
+        point = decision_at if decision_at is not None else now
+        for value in (point, available_at):
+            if value is not None and (
+                not isinstance(value, datetime)
+                or value != value
+                or (value.tzinfo is None) != (now.tzinfo is None)
+            ):
+                raise ValueError("Roll clocks require feed-compatible physical instants")
+        if point > now or available_at is not None and available_at > point:
+            raise ValueError("A roll cannot precede its selection decision or availability")
+        selection_json = action_terms_json(dict(selection)) if selection is not None else None
+        existing = self._execution_journal.futures_roll_intents
+        for intent in existing or ():
+            if intent["roll_id"] != roll_id:
+                continue
+            if (
+                intent["close_asset"] != old_asset
+                or intent["open_asset"] != new_asset
+                or decision_at is not None
+                and intent["decision_at"] != point.isoformat()
+                or available_at is not None
+                and intent["available_at"] != available_at.isoformat()
+                or new_quantity is not None
+                and intent["open_quantity"] != new_quantity
+                or selection_json is not None
+                and intent["selection_json"] != selection_json
+            ):
+                raise ValueError("Conflicting roll_id cannot replace an existing intent")
+            return (
+                self.get_order(intent["close_order_id"])
+                if intent["close_order_id"] is not None
+                else None,
+                self.get_order(intent["open_order_id"])
+                if intent["open_order_id"] is not None
+                else None,
+            )
+        if any(
+            order.asset in (old_asset, new_asset) for order in self.get_orders(pending_only=True)
+        ):
+            raise ValueError("Resolve pending orders for both contracts before submitting a roll")
+        position = self.get_position(old_asset)
+        quantity = position.quantity if position is not None else 0.0
+        replacement = quantity if new_quantity is None else new_quantity
+        if (
+            isinstance(replacement, bool)
+            or not isinstance(replacement, (int, float))
+            or not isfinite(replacement)
+            or quantity
+            and replacement * quantity <= 0
+        ):
+            raise ValueError("Replacement quantity must be finite and preserve the roll direction")
+        if quantity and new_quantity is None and old_spec.multiplier != new_spec.multiplier:
+            raise ValueError("Declare new_quantity when roll contract multipliers differ")
+        self._capture_lifecycle_mutation(
+            all_positions=True, all_pending_orders=True, all_asset_stats=True
+        )
+        state = self._snapshot_lifecycle_state(
+            all_positions=True, all_pending_orders=True, all_asset_stats=True
+        )
+        try:
+            options = SubmitOrderOptions(rebalance_id=f"FUTURES-ROLL:{roll_id}")
+            close = self.submit_order(old_asset, -quantity, _options=options) if quantity else None
+            opened = (
+                self.submit_order(new_asset, replacement, _options=options)
+                if quantity and close is not None and close.status is not OrderStatus.REJECTED
+                else None
+            )
+            if self._execution_journal.futures_roll_intents is None:
+                self._execution_journal.futures_roll_intents = []
+            self._execution_journal.futures_roll_intents.append(
+                {
+                    "roll_id": roll_id,
+                    "close_asset": old_asset,
+                    "open_asset": new_asset,
+                    "close_quantity": -quantity,
+                    "open_quantity": replacement if quantity else 0.0,
+                    "close_order_id": close.order_id if close is not None else None,
+                    "open_order_id": opened.order_id if opened is not None else None,
+                    "decision_at": point.isoformat(),
+                    "available_at": available_at.isoformat() if available_at is not None else None,
+                    "submitted_at": now.isoformat(),
+                    "selection_json": selection_json,
+                }
+            )
+            return close, opened
+        except Exception:
+            self._restore_lifecycle_state(state)
+            raise
+
+    def _observed_rolls(self):
+        intents = self._execution_journal.futures_roll_intents
+        if intents is None:
+            return None
+        from ._rolls import project_rolls
+
+        return project_rolls(intents, self._order_state.orders, self._execution_journal.fills)
 
     def submit_bracket(
         self,
@@ -3082,6 +3339,11 @@ class Broker:
         if self.settlement_delay > 0:
             self.account.release_settled(self._bar_index)
 
+        corporate = self.account.corporate
+        if corporate is not None and corporate.marks:
+            for asset, price in prices.items():
+                if isfinite(price):
+                    corporate.marks.pop(asset, None)
         for asset, price in prices.items():
             if not isfinite(price):
                 continue

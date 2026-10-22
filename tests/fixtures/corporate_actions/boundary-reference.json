@@ -1,0 +1,1347 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "reference_wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "producer_revision": "c3b9db80a66397420fb27adeccc762559dd41e07",
+  "dependencies": {
+    "zipline-reloaded": "3.2.0",
+    "ml4t-data": "0.2.2.dev21+gc3b9db80a",
+    "ml4t-specs": "0.2.0",
+    "numpy": "2.5.4",
+    "pandas": "2.3.3"
+  },
+  "scope": "Original daily equity action ledger. Explicit zero costs and either full fills or four units per bar isolate position/order/entitlement accounting. No benchmark, migration-completion or general-merger claim.",
+  "declared_price_publication": "Synthetic fixture prices are known at their captured physical close; the exported session labels are not publication instants.",
+  "unknown_export_fields": "Retain unknown publication/currency terms from the original bundle as null. Any additional native fixture declaration is recorded separately, not attributed to Data export.",
+  "timing_claim": false,
+  "cases": [
+    {
+      "input": {
+        "name": "cash_price_discovery",
+        "quantity": 10,
+        "dividend": 1.0,
+        "extra_move": 7.0
+      },
+      "snapshot_id": "8bbf64379dc192e8c5cb4437ad405d4574641a45ea57d4f64402885ac4f67bf0",
+      "sessions": [
+        "2025-03-03",
+        "2025-03-04",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-10"
+      ],
+      "closes": [
+        "2025-03-03T21:00:00+00:00",
+        "2025-03-04T21:00:00+00:00",
+        "2025-03-05T21:00:00+00:00",
+        "2025-03-06T21:00:00+00:00",
+        "2025-03-07T21:00:00+00:00",
+        "2025-03-10T20:00:00+00:00"
+      ],
+      "premarket": [
+        {
+          "timestamp": "2025-03-03T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": []
+        },
+        {
+          "timestamp": "2025-03-04T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 10060.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 10060.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T13:45:00+00:00",
+          "cash": 9010.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T12:45:00+00:00",
+          "cash": 9010.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "trace": [
+        {
+          "timestamp": "2025-03-03T21:00:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10000.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10060.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10060.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T21:00:00+00:00",
+          "cash": 9010.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T20:00:00+00:00",
+          "cash": 9010.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 106.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "ad77c420eefe4160a10e21affd14ab7f",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "nav": [
+        10000.0,
+        10000.0,
+        10060.0,
+        10060.0,
+        10070.0,
+        10070.0
+      ],
+      "cash": [
+        10000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9010.0,
+        9010.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "sid": 7,
+          "quantity": 10.0,
+          "price": 100.0,
+          "commission": null
+        }
+      ]
+    },
+    {
+      "input": {
+        "name": "stock_price_discovery",
+        "quantity": 10,
+        "stock": 0.2,
+        "extra_move": 7.0
+      },
+      "snapshot_id": "51afdafbdfccf548c912d1a2847ec790b72ae2a57978f614cd91719c91318adc",
+      "sessions": [
+        "2025-03-03",
+        "2025-03-04",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-10"
+      ],
+      "closes": [
+        "2025-03-03T21:00:00+00:00",
+        "2025-03-04T21:00:00+00:00",
+        "2025-03-05T21:00:00+00:00",
+        "2025-03-06T21:00:00+00:00",
+        "2025-03-07T21:00:00+00:00",
+        "2025-03-10T20:00:00+00:00"
+      ],
+      "premarket": [
+        {
+          "timestamp": "2025-03-03T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": []
+        },
+        {
+          "timestamp": "2025-03-04T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9870.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9870.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            },
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "cost_basis": 0.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T12:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            },
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "cost_basis": 0.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "trace": [
+        {
+          "timestamp": "2025-03-03T21:00:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10000.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9870.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9870.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            },
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "cost_basis": 0.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T20:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10070.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 87.0
+            },
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "cost_basis": 0.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "b75661cc7ac74007971c4e3bca3ded47",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "nav": [
+        10000.0,
+        10000.0,
+        9870.0,
+        9870.0,
+        10070.0,
+        10070.0
+      ],
+      "cash": [
+        10000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "sid": 7,
+          "quantity": 10.0,
+          "price": 100.0,
+          "commission": null
+        }
+      ]
+    },
+    {
+      "input": {
+        "name": "own_stock",
+        "quantity": 10,
+        "stock": 0.2,
+        "own_stock": true
+      },
+      "snapshot_id": "8c6d6a1fdf65ce6f90ea09d0aff3ac7a19d2b3c7ef225872bb097cd826a95d96",
+      "sessions": [
+        "2025-03-03",
+        "2025-03-04",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-10"
+      ],
+      "closes": [
+        "2025-03-03T21:00:00+00:00",
+        "2025-03-04T21:00:00+00:00",
+        "2025-03-05T21:00:00+00:00",
+        "2025-03-06T21:00:00+00:00",
+        "2025-03-07T21:00:00+00:00",
+        "2025-03-10T20:00:00+00:00"
+      ],
+      "premarket": [
+        {
+          "timestamp": "2025-03-03T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": []
+        },
+        {
+          "timestamp": "2025-03-04T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9833.33,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9833.33,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9999.996,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 12.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T12:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9999.996,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 12.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "trace": [
+        {
+          "timestamp": "2025-03-03T21:00:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10000.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9833.33,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9833.33,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9999.996,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 12.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T20:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9999.996,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 12.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 83.333
+            }
+          ],
+          "orders": [
+            {
+              "id": "c79033cc882f4416af642dab3e622c27",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "nav": [
+        10000.0,
+        10000.0,
+        9833.33,
+        9833.33,
+        9999.996,
+        9999.996
+      ],
+      "cash": [
+        10000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "sid": 7,
+          "quantity": 10.0,
+          "price": 100.0,
+          "commission": null
+        }
+      ]
+    },
+    {
+      "input": {
+        "name": "distinct_record_date",
+        "quantity": 10,
+        "dividend": 1.0,
+        "record_offset": 4,
+        "close_on_ex": true
+      },
+      "snapshot_id": "8cb866479941ae715960f46912745a27504466287308a7f5700c1f79740e4540",
+      "sessions": [
+        "2025-03-03",
+        "2025-03-04",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-10"
+      ],
+      "closes": [
+        "2025-03-03T21:00:00+00:00",
+        "2025-03-04T21:00:00+00:00",
+        "2025-03-05T21:00:00+00:00",
+        "2025-03-06T21:00:00+00:00",
+        "2025-03-07T21:00:00+00:00",
+        "2025-03-10T20:00:00+00:00"
+      ],
+      "premarket": [
+        {
+          "timestamp": "2025-03-03T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": []
+        },
+        {
+          "timestamp": "2025-03-04T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9990.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 99.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T13:45:00+00:00",
+          "cash": 9000.0,
+          "nav": 9990.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 99.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T13:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": -10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T12:45:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": -10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "trace": [
+        {
+          "timestamp": "2025-03-03T21:00:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 10000.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 100.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T21:00:00+00:00",
+          "cash": 9000.0,
+          "nav": 9990.0,
+          "positions": [
+            {
+              "sid": 7,
+              "quantity": 10.0,
+              "cost_basis": 100.0,
+              "last_sale_price": 99.0
+            }
+          ],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": 0.0,
+              "commission": 0.0,
+              "status": 0,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T21:00:00+00:00",
+          "cash": 9990.0,
+          "nav": 9990.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": -10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T21:00:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": -10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T20:00:00+00:00",
+          "cash": 10000.0,
+          "nav": 10000.0,
+          "positions": [],
+          "orders": [
+            {
+              "id": "a8dc2a92453846fcbe96e29cc844641e",
+              "amount": 10.0,
+              "filled": 10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            },
+            {
+              "id": "a4dd4932a8f54501bc46ad835f532726",
+              "amount": -10.0,
+              "filled": -10.0,
+              "commission": 0.0,
+              "status": 1,
+              "limit": null,
+              "stop": null
+            }
+          ]
+        }
+      ],
+      "nav": [
+        10000.0,
+        10000.0,
+        9990.0,
+        9990.0,
+        10000.0,
+        10000.0
+      ],
+      "cash": [
+        10000.0,
+        9000.0,
+        9000.0,
+        9990.0,
+        10000.0,
+        10000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T21:00:00+00:00",
+          "sid": 7,
+          "quantity": 10.0,
+          "price": 100.0,
+          "commission": null
+        },
+        {
+          "timestamp": "2025-03-06T21:00:00+00:00",
+          "sid": 7,
+          "quantity": -10.0,
+          "price": 99.0,
+          "commission": null
+        }
+      ]
+    }
+  ],
+  "reference_source_revision": "cf649ac06fddce76f6caa2403cd8494ac84f72ad",
+  "capture_assumptions": {
+    "native_publication": "The synthetic terms are explicitly declared available at the first captured close, after the original civil declaration date and before the ex session. This is a caller fixture declaration; the original export retains unknown publication as null.",
+    "currency": "The synthetic instruments and cash distributions are explicitly denominated in USD. This declaration is separate from exported unknown currency.",
+    "share_basis": "Cash dividend and stock eligibility uses pre-event shares.",
+    "prices": "Session labels map to captured original physical closes; no implicit timezone or guessed availability."
+  },
+  "native_action_preparation": {
+    "api": "ml4t.data.adjustments.prepare_action_inputs",
+    "package": "ml4t-data==0.2.2.dev21+gc3b9db80a",
+    "source": "c3b9db80a66397420fb27adeccc762559dd41e07",
+    "required_terms": [
+      "available_at",
+      "currency",
+      "share_basis"
+    ],
+    "supplemental_declarations": {
+      "native_publication": "The synthetic terms are explicitly declared available at the first captured close, after the original civil declaration date and before the ex session. This is a caller fixture declaration; the original export retains unknown publication as null.",
+      "currency": "The synthetic instruments and cash distributions are explicitly denominated in USD. This declaration is separate from exported unknown currency.",
+      "share_basis": "Cash dividend and stock eligibility uses pre-event shares.",
+      "prices": "Session labels map to captured original physical closes; no implicit timezone or guessed availability."
+    },
+    "raw_snapshot_modified": false
+  },
+  "bounded_comparison": "Daily closing account/fill ledger matches; premarket same-day quote is a demonstrated original lookahead difference. Native previous marks remain causal. Own-share prices retain original reader three-decimal precision."
+}

@@ -556,6 +556,7 @@ class BacktestConfig:
     mark_price: ExecutionPrice = ExecutionPrice.PRICE
     next_bar_execution_price: ExecutionPrice | None = field(default=None, kw_only=True)
     cancel_policy: CancelPolicy = field(default=CancelPolicy.NEVER, kw_only=True)
+    corporate_action_policy: str = field(default="declared_terms", kw_only=True)
     conditional_order_mode: ConditionalOrderMode = field(
         default=ConditionalOrderMode.BAR_OHLC, kw_only=True
     )
@@ -834,6 +835,8 @@ class BacktestConfig:
         return instance
 
     def __post_init__(self) -> None:
+        if self.corporate_action_policy not in {"declared_terms", "zipline_3_2"}:
+            raise ValueError("corporate_action_policy must be declared_terms or zipline_3_2")
         self.cancel_policy = CancelPolicy(self.cancel_policy)
         self.conditional_order_mode = ConditionalOrderMode(self.conditional_order_mode)
         if self.next_bar_execution_price is not None:
@@ -1017,6 +1020,7 @@ class BacktestConfig:
                 "mark_price": self.mark_price.value,
                 "execution_mode": self.execution_mode.value,
                 "cancel_policy": self.cancel_policy.value,
+                "corporate_action_policy": self.corporate_action_policy,
                 "conditional_order_mode": self.conditional_order_mode.value,
                 "next_bar_execution_price": (
                     self.next_bar_execution_price.value
@@ -1145,6 +1149,7 @@ class BacktestConfig:
                     "execution_mode",
                     "next_bar_execution_price",
                     "cancel_policy",
+                    "corporate_action_policy",
                     "conditional_order_mode",
                 },
                 "stops": {
@@ -1289,6 +1294,7 @@ class BacktestConfig:
             ),
             next_bar_execution_price=exec_cfg.get("next_bar_execution_price"),
             cancel_policy=exec_cfg.get("cancel_policy", "never"),
+            corporate_action_policy=exec_cfg.get("corporate_action_policy", "declared_terms"),
             conditional_order_mode=exec_cfg.get("conditional_order_mode", "bar_ohlc"),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),

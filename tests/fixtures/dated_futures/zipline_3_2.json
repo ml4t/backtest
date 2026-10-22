@@ -1,0 +1,678 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "source_revision": "cf649ac06fddce76f6caa2403cd8494ac84f72ad",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "calendar": "us_futures",
+  "timing_claim": false,
+  "cases": [
+    {
+      "name": "calendar",
+      "trace": [
+        {
+          "timestamp": "2025-07-07T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4000.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": null,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4010.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4000.0,
+              4010.0
+            ],
+            "add": [
+              4000.0,
+              4010.0
+            ],
+            "mul": [
+              4000.0,
+              4010.0
+            ]
+          },
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-09T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4020.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4010.0,
+              4030.0
+            ],
+            "add": [
+              4020.0,
+              4030.0
+            ],
+            "mul": [
+              4020.0,
+              4030.0
+            ]
+          },
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4040.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4030.0,
+              4040.0
+            ],
+            "add": [
+              4030.0,
+              4040.0
+            ],
+            "mul": [
+              4030.0,
+              4040.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4030.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-11T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4050.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4040.0,
+              4050.0
+            ],
+            "add": [
+              4040.0,
+              4050.0
+            ],
+            "mul": [
+              4040.0,
+              4050.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-14T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4060.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4050.0,
+              4060.0
+            ],
+            "add": [
+              4050.0,
+              4060.0
+            ],
+            "mul": [
+              4050.0,
+              4060.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "sid": 17,
+          "quantity": 1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "sid": 17,
+          "quantity": -1.0,
+          "price": 4030.0
+        }
+      ]
+    },
+    {
+      "name": "volume",
+      "trace": [
+        {
+          "timestamp": "2025-07-07T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4000.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": null,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4010.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4000.0,
+              4010.0
+            ],
+            "add": [
+              4000.0,
+              4010.0
+            ],
+            "mul": [
+              4000.0,
+              4010.0
+            ]
+          },
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-09T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4030.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4010.0,
+              4030.0
+            ],
+            "add": [
+              4020.0,
+              4030.0
+            ],
+            "mul": [
+              4020.0,
+              4030.0
+            ]
+          },
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4040.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4030.0,
+              4040.0
+            ],
+            "add": [
+              4030.0,
+              4040.0
+            ],
+            "mul": [
+              4030.0,
+              4040.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4030.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-11T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4050.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4040.0,
+              4050.0
+            ],
+            "add": [
+              4040.0,
+              4050.0
+            ],
+            "mul": [
+              4040.0,
+              4050.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-14T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4060.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4050.0,
+              4060.0
+            ],
+            "add": [
+              4050.0,
+              4060.0
+            ],
+            "mul": [
+              4050.0,
+              4060.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "sid": 17,
+          "quantity": 1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "sid": 17,
+          "quantity": -1.0,
+          "price": 4030.0
+        }
+      ]
+    },
+    {
+      "name": "expiry",
+      "trace": [
+        {
+          "timestamp": "2025-07-07T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4000.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": null,
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4010.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4000.0,
+              4010.0
+            ],
+            "add": [
+              4000.0,
+              4010.0
+            ],
+            "mul": [
+              4000.0,
+              4010.0
+            ]
+          },
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-09T21:00:00+00:00",
+          "selected_sid": 17,
+          "continuous_price": 4020.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4010.0,
+              4030.0
+            ],
+            "add": [
+              4020.0,
+              4030.0
+            ],
+            "mul": [
+              4020.0,
+              4030.0
+            ]
+          },
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4040.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4030.0,
+              4040.0
+            ],
+            "add": [
+              4030.0,
+              4040.0
+            ],
+            "mul": [
+              4030.0,
+              4040.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 17,
+              "quantity": 1.0,
+              "mark": 4030.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-07-11T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4050.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4040.0,
+              4050.0
+            ],
+            "add": [
+              4040.0,
+              4050.0
+            ],
+            "mul": [
+              4040.0,
+              4050.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-07-14T21:00:00+00:00",
+          "selected_sid": 23,
+          "continuous_price": 4060.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4050.0,
+              4060.0
+            ],
+            "add": [
+              4050.0,
+              4060.0
+            ],
+            "mul": [
+              4050.0,
+              4060.0
+            ]
+          },
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        101000.0,
+        101000.0
+      ],
+      "analysis_input": {
+        "index": [
+          "2025-07-07T21:00:00+00:00",
+          "2025-07-08T21:00:00+00:00",
+          "2025-07-09T21:00:00+00:00",
+          "2025-07-10T21:00:00+00:00",
+          "2025-07-11T21:00:00+00:00",
+          "2025-07-14T21:00:00+00:00"
+        ],
+        "records": [
+          {
+            "returns": 0.0,
+            "portfolio_value": 100000.0,
+            "ending_cash": 100000.0,
+            "positions": [],
+            "transactions": []
+          },
+          {
+            "returns": 0.0,
+            "portfolio_value": 100000.0,
+            "ending_cash": 100000.0,
+            "positions": [
+              {
+                "sid": 17,
+                "amount": 1.0,
+                "last_sale_price": 4010.0,
+                "cost_basis": 4010.0
+              }
+            ],
+            "transactions": [
+              {
+                "sid": 17,
+                "amount": 1.0,
+                "price": 4010.0,
+                "dt": "2025-07-08T21:00:00+00:00",
+                "commission": null
+              }
+            ]
+          },
+          {
+            "returns": 0.004999999999999893,
+            "portfolio_value": 100500.0,
+            "ending_cash": 100500.0,
+            "positions": [
+              {
+                "sid": 17,
+                "amount": 1.0,
+                "last_sale_price": 4020.0,
+                "cost_basis": 4010.0
+              }
+            ],
+            "transactions": []
+          },
+          {
+            "returns": 0.004975124378109541,
+            "portfolio_value": 101000.0,
+            "ending_cash": 101000.0,
+            "positions": [],
+            "transactions": [
+              {
+                "sid": 17,
+                "amount": -1.0,
+                "price": 4030.0,
+                "dt": "2025-07-10T21:00:00+00:00",
+                "commission": null
+              }
+            ]
+          },
+          {
+            "returns": 0.0,
+            "portfolio_value": 101000.0,
+            "ending_cash": 101000.0,
+            "positions": [],
+            "transactions": []
+          },
+          {
+            "returns": 0.0,
+            "portfolio_value": 101000.0,
+            "ending_cash": 101000.0,
+            "positions": [],
+            "transactions": []
+          }
+        ],
+        "asset_metadata": {
+          "17": {
+            "symbol": "TESTN25",
+            "multiplier": 50.0
+          }
+        },
+        "transport": "Actual original dataframe fields; asset objects become explicit integer SIDs. Reported returns are not reconstructed from NAV."
+      },
+      "fills": [
+        {
+          "timestamp": "2025-07-08T21:00:00+00:00",
+          "sid": 17,
+          "quantity": 1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-07-10T21:00:00+00:00",
+          "sid": 17,
+          "quantity": -1.0,
+          "price": 4030.0
+        }
+      ]
+    }
+  ]
+}

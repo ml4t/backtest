@@ -16,6 +16,9 @@ _INTERNAL_NAMES = {"AGENTS.md", "CLAUDE.md"}
 _APPROVED_TEST_DATA = (
     _TESTS / "compatibility" / "snapshots",
     _TESTS / "fixtures" / "artifacts",
+    _TESTS / "fixtures" / "corporate_actions",
+    _TESTS / "fixtures" / "dated_futures",
+    _TESTS / "fixtures" / "futures_variation",
     _TESTS / "fixtures" / "history_sources",
     _TESTS / "fixtures" / "performance_reuse",
     _TESTS / "fixtures" / "prepared_benchmark",

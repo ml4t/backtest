@@ -31,6 +31,9 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "tutorials" / "profiles-and-parity.md",
     _ROOT / "docs" / "tutorials" / "results-and-analysis.md",
     _ROOT / "docs" / "user-guide" / "accounts.md",
+    _ROOT / "docs" / "user-guide" / "corporate-actions.md",
+    _ROOT / "docs" / "user-guide" / "futures-accounting.md",
+    _ROOT / "docs" / "user-guide" / "dated-futures.md",
     _ROOT / "docs" / "user-guide" / "orders.md",
     _ROOT / "docs" / "user-guide" / "strategies.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
@@ -43,6 +46,10 @@ _API_AUDIT_PATHS = (
 )
 _REQUIRED_EXAMPLES = frozenset(
     {
+        "raw-corporate-actions",
+        "futures-scheduled-account",
+        "futures-mark-callbacks",
+        "dated-futures-roll-and-notice",
         "runtime-causal-session",
         "runtime-auxiliary-source",
         "runtime-stale-views",

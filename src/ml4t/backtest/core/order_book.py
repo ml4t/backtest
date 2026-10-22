@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     from ..broker import Broker
     from .fill_engine import FillEngine
 
+type SubmissionState = tuple[
+    object | None, float, dict[str, tuple[float, float]], dict[str, float | None] | None
+]
+
 
 class OrderBook:
     """Handles order submission/mutation/retrieval."""
@@ -46,6 +50,25 @@ class OrderBook:
         self._submission_shadow_bar: object | None = None
         self._submission_shadow_cash: float = 0.0
         self._submission_shadow_positions: dict[str, tuple[float, float]] = {}
+        self._submission_shadow_variation: dict[str, float | None] | None = None
+
+    def snapshot_submission_state(self) -> SubmissionState:
+        return (
+            self._submission_shadow_bar,
+            self._submission_shadow_cash,
+            dict(self._submission_shadow_positions),
+            dict(self._submission_shadow_variation)
+            if self._submission_shadow_variation is not None
+            else None,
+        )
+
+    def restore_submission_state(self, state: SubmissionState) -> None:
+        (
+            self._submission_shadow_bar,
+            self._submission_shadow_cash,
+            self._submission_shadow_positions,
+            self._submission_shadow_variation,
+        ) = state
 
     @staticmethod
     def _validate_prices(
@@ -144,6 +167,10 @@ class OrderBook:
         self.orders.orders.append(order)
         if control_request is not None:
             broker._commit_control_order(control_request)
+
+        if self.account.corporate is not None and asset in self.account.corporate.converted_assets:
+            order.reject("Instrument was converted by a corporate action", "instrument_converted")
+            return order
 
         # Immediate fill: same-bar market orders fill during submit_order()
         # instead of being queued for later _process_orders(). Each order
@@ -363,7 +390,13 @@ class OrderBook:
     def _reset_submission_shadow_if_needed(self) -> None:
         broker = self.broker
         ts = self.market.time
-        bar_key = ts.date() if ts is not None else None
+        bar_key = (
+            self.market.bar_index
+            if self.account.futures_methods is not None
+            else ts.date()
+            if ts is not None
+            else None
+        )
         if bar_key == self._submission_shadow_bar:
             return
 
@@ -379,6 +412,15 @@ class OrderBook:
             for asset, pos in self.account.positions.items()
             if abs(pos.quantity) > quantity_zero_tolerance(pos.quantity)
         }
+        self._submission_shadow_variation = (
+            {
+                asset: pos.variation_basis
+                for asset, pos in self.account.positions.items()
+                if asset in self.account.futures_methods
+            }
+            if self.account.futures_methods is not None
+            else None
+        )
 
     def _build_shadow_policy_positions(self) -> dict[str, Position]:
         broker = self.broker
@@ -395,6 +437,11 @@ class OrderBook:
                 current_price=mark_price,
                 entry_time=ts,
                 multiplier=broker.get_multiplier(asset),
+                variation_basis=(
+                    self._submission_shadow_variation.get(asset)
+                    if self._submission_shadow_variation is not None
+                    else None
+                ),
             )
         return positions
 
@@ -445,11 +492,13 @@ class OrderBook:
 
         self._reset_submission_shadow_if_needed()
 
-        if broker.allow_leverage and not broker.next_bar_simple_cash_check:
+        variation = order.asset in (self.account.futures_methods or {})
+        if broker.allow_leverage and (not broker.next_bar_simple_cash_check or variation):
             return self._passes_margin_submission_precheck(
                 order,
                 signal_price,
-                commit=not broker.next_bar_queue_shadow_validation,
+                commit=not broker.next_bar_queue_shadow_validation
+                and not (variation and broker.buying_power_reservation),
             )
 
         size = order.quantity if order.side is OrderSide.BUY else -order.quantity
@@ -530,6 +579,9 @@ class OrderBook:
             return True
 
         self._reset_submission_shadow_if_needed()
+
+        if order.asset in (self.account.futures_methods or {}):
+            return self._passes_margin_submission_precheck(order, signal_price)
 
         size = order.quantity if order.side is OrderSide.BUY else -order.quantity
         old_qty, old_price = self._submission_shadow_positions.get(order.asset, (0.0, signal_price))
@@ -664,7 +716,27 @@ class OrderBook:
             return True
 
         multiplier = broker.get_multiplier(order.asset)
-        self._submission_shadow_cash += -size * signal_price * multiplier - commission
+        if self.account.futures_methods is not None and order.asset in self.account.futures_methods:
+            from .._variation import variation_fill
+
+            bases = self._submission_shadow_variation
+            assert bases is not None
+            payout, _quantity, basis = variation_fill(
+                old_qty,
+                bases.get(order.asset),
+                size,
+                new_qty,
+                signal_price,
+                multiplier,
+                self.account.futures_methods[order.asset],
+            )
+            self._submission_shadow_cash += payout - commission
+            if basis is None:
+                bases.pop(order.asset, None)
+            else:
+                bases[order.asset] = basis
+        else:
+            self._submission_shadow_cash += -size * signal_price * multiplier - commission
         if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:

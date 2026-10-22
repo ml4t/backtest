@@ -677,6 +677,10 @@ class TestBacktestResultParquet:
             manifest = json.loads((path / "manifest.json").read_text())
 
             assert manifest["omitted_components"] == {
+                "futures_settlements": "futures variation was not captured",
+                "futures_rolls": "futures roll intents were not captured",
+                "corporate_actions": "corporate-action applications were not captured",
+                "corporate_entitlements": "corporate entitlements were not captured",
                 "holdings": "holdings were not captured",
                 "benchmark": "result has no prepared benchmark",
                 "recorded_variables": "strategy variables were not recorded",

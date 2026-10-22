@@ -207,20 +207,20 @@ native key; use `int(asset)` only when an actual legacy integer SID was supplied
 
 ## Match ledger and corporate-action assumptions
 
-`Engine` does not automatically turn arbitrary `split_ratio` or `cash_dividend`
-columns into share adjustments or cash payments. Prepare the input price and
-share-unit basis explicitly upstream. Adjusted bars alone do not reproduce an
-unadjusted ledger's dividend entitlement, payment date or split-adjusted share
-count. Keep an action-sensitive migration on the reference engine until its
-required event workflow is supported and compared.
+Pass explicit raw event facts through `DataFeed(corporate_actions=...,
+input_manifest=...)`. The [corporate-action guide](corporate-actions.md) runs a
+split and delayed dividend payment, specifies event clocks and input basis, and
+documents the tested `zipline_3_2` method. Arbitrary event columns in a price frame
+do not activate accounting. Adjusted bars alone do not reproduce raw share counts
+or payment entitlements. Match your event terms and method to the tested scope.
 
-Contract multipliers and fixed margin schedules support contract P&L and
-buying-power checks. Backtest's current leveraged ledger still moves full trade
-notional through cash and values the position at notional. It does not implement
-Zipline's futures variation-cash ledger. With $100,000 initial cash, buying one
-contract at 4,000 with a $50 multiplier moves $200,000 from cash into the
-position. A later 10-point rise adds $500 to equity; matching that equity does
-not establish cash-ledger parity. See [account policies](accounts.md).
+The native default remains signed-notional cash accounting. For migrated futures,
+declare `ContractSpec(accounting_method="futures_variation", settlement_policy="on_mark")`.
+The [futures-accounting guide](futures-accounting.md) runs callback orders through
+the native variation ledger. Its captured original 3.2.0 scenarios compare cash,
+NAV, basis, positions and fills, including fees and reversals. Scheduled exchange
+settlement is a separate explicit policy, with independent dollar oracles.
+Margin constrains entry; it does not select cash accounting or payout frequency.
 
 The retained CME workload contains continuous root series without a dated
 contract chain and roll map, so its Zipline comparison is explicitly unsupported.
@@ -358,8 +358,9 @@ all Zipline workflows are supported.
 This initial adapter does not yet implement
 the original Pipeline construction API. Use the [prepared panel route](#deliver-prepared-pipeline-results)
 for factor delivery and the [frozen CSV route](#register-an-offline-csv-source)
-for auxiliary inputs. Raw corporate actions and futures variation-cash settlement
-remain separate unfinished accounting work.
+for auxiliary inputs. [Raw corporate actions](corporate-actions.md) use explicit
+event inputs; [futures variation](futures-accounting.md) requires an explicit
+per-instrument method and payout policy.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
 records it as not supplied unless prepared benchmark data is passed. An asset
@@ -1164,6 +1165,12 @@ for a fixed spread, or `NoSlippage` for zero impact with positive observed
 volume. These adapter choices leave native Backtest defaults unchanged.
 
 ### Declare futures contracts and per-order costs
+
+For `continuous_future`, `data.current_chain`, and the selected dated contract,
+use the registered Data-backed route in
+[dated-futures migration](dated-futures.md#retain-continuous-futures-callback-reads).
+Its complete offline example covers raw, additive and multiplicative history,
+with explicit roll-mark conventions and separate raw-contract execution.
 
 Use `Future` for a dated contract whose root, multiplier and tick size are
 known. `PreparedAssetLookup` also builds these objects from Data's exported

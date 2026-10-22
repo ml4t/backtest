@@ -340,6 +340,8 @@ class FillExecutor:
             currency=broker._get_contract_currency(order.asset),
         )
         self.journal.fills.append(fill)
+        if self.account.corporate is not None and self.account.corporate.flat_deliveries:
+            self.account.corporate.flat_deliveries.pop(order.asset, None)
 
         # Determine if partial fill
         is_partial = order.order_id in self.orders.partial_quantities
@@ -376,6 +378,7 @@ class FillExecutor:
             old_position._commission_adjusted_cost_basis if old_position is not None else None
         )
         old_entry = old_position.entry_price if old_position is not None else 0.0
+        variation_basis = old_position.variation_basis if old_position is not None else None
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
@@ -388,8 +391,10 @@ class FillExecutor:
                 basis = fill_price
             elif old_quantity * signed_qty > 0.0:
                 basis = (basis * old_quantity + fill_price * signed_qty) / position.quantity
-            position._commission_adjusted_cost_basis = basis + (
-                actual_commission / (position.quantity * multiplier)
+            position._commission_adjusted_cost_basis = (
+                (basis * position.quantity + actual_commission / multiplier) / position.quantity
+                if actual_commission
+                else basis
             )
 
         self._update_lock_notional_free_cash(
@@ -399,7 +404,45 @@ class FillExecutor:
         )
 
         # Update cash (include multiplier for futures/derivatives)
-        cash_change = -signed_qty * fill_price * multiplier - actual_commission
+        if self.account.futures_methods is not None and order.asset in self.account.futures_methods:
+            from .._variation import variation_fill
+
+            mode = self.account.futures_methods[order.asset]
+            payout, payout_quantity, basis = variation_fill(
+                old_quantity,
+                variation_basis,
+                signed_qty,
+                position.quantity if position is not None else 0.0,
+                fill_price,
+                multiplier,
+                mode,
+            )
+            cash_change = payout - actual_commission
+            if position is not None:
+                position.variation_basis = basis
+            if payout_quantity:
+                settlements = self.journal.futures_settlements
+                assert settlements is not None
+                settlements.append(
+                    {
+                        "timestamp": current_time,
+                        "available_at": current_time,
+                        "asset": order.asset,
+                        "source": "ml4t.backtest/fill",
+                        "event_id": f"{order.order_id}:{len(self.journal.fills) - 1}",
+                        "revision_id": "generated",
+                        "phase": "fill_mark" if mode == "on_mark" else "close",
+                        "quantity": payout_quantity,
+                        "basis_before": variation_basis,
+                        "settlement_price": fill_price,
+                        "multiplier": multiplier,
+                        "currency": broker._get_contract_currency(order.asset),
+                        "cash_delta": payout,
+                        "fill_sequence": len(self.journal.fills) - 1,
+                    }
+                )
+        else:
+            cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
         if shared_budget is not None or contextual_slippage:
             self.orders.volume_consumed_by_asset[order.asset] = (
@@ -425,7 +468,14 @@ class FillExecutor:
                     self.orders.pending.remove(o)
 
         if self.journal.fill_snapshots is not None:
-            state, holdings = broker._portfolio_snapshot(include_holdings=True)
+            state, holdings = broker._portfolio_snapshot(
+                include_holdings=True, observation_key=(current_time, len(self.journal.fills) - 1)
+            )
+            if self.journal.corporate_receivable_snapshots is not None:
+                assert self.account.corporate is not None
+                self.journal.corporate_receivable_snapshots[
+                    (current_time, len(self.journal.fills) - 1)
+                ] = self.account.corporate.receivable_value
             assert holdings is not None
             self.journal.fill_snapshots.append(
                 (len(self.journal.fills) - 1, current_time, state, holdings)

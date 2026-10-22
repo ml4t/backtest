@@ -5,9 +5,21 @@ delegates validation to the appropriate AccountPolicy.
 """
 
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 from ..types import Position
 from .policy import AccountPolicy
+
+
+@dataclass(slots=True)
+class CorporateState:
+    entitlements: dict[tuple[str, str], dict[str, Any]] = field(default_factory=dict)
+    receivable_value: float = 0.0
+    converted_assets: set[str] = field(default_factory=set)
+    flat_deliveries: dict[str, tuple[int, float]] = field(default_factory=dict)
+    marks: dict[str, tuple[float, float, datetime | None]] = field(default_factory=dict)
 
 
 class AccountState:
@@ -41,6 +53,8 @@ class AccountState:
         self._lock_notional_short_basis: dict[str, float] = {}
         self.positions: dict[str, Position] = {}
         self.policy = policy
+        self.corporate: CorporateState | None = None
+        self.futures_methods: dict[str, str] | None = None
 
         # Settlement tracking: holds are (settle_bar, amount) pairs
         self._settlement_holds: deque[tuple[int, float]] = deque()
@@ -51,12 +65,16 @@ class AccountState:
         """Calculate total account equity (Net Liquidating Value).
 
         For both cash and margin accounts:
-            NLV = Cash + Σ(position.market_value)
+            NLV = Cash + Σ(position.market_value) + recognized action receivables
 
         Returns:
             Total account equity
         """
-        return self.cash + sum(p.market_value for p in self.positions.values())
+        return (
+            self.cash
+            + sum(p.market_value for p in self.positions.values())
+            + (self.corporate.receivable_value if self.corporate is not None else 0.0)
+        )
 
     @property
     def buying_power(self) -> float:

@@ -8,6 +8,7 @@ import pandas as pd
 
 from ._scope import current
 from .assets import Asset, Future
+from .continuous import ContinuousFuture
 from .csv import PreparedCSV
 from .events import _DateRule, _TimeRule
 from .events import calendars as calendars
@@ -32,6 +33,12 @@ def sid(sid: int) -> Asset:
 
 def future_symbol(symbol: str) -> Future:
     return current().future_symbol(symbol)
+
+
+def continuous_future(
+    root_symbol_str: str, offset: int = 0, roll: str = "volume", adjustment: str | None = "mul"
+) -> ContinuousFuture:
+    return current().continuous_future(root_symbol_str, offset, roll, adjustment)
 
 
 def order(

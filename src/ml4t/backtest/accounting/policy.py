@@ -17,6 +17,7 @@ Account types map to these parameters:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from math import isfinite
 from typing import TYPE_CHECKING
 
 from ..core.shared import CASH_TOLERANCE
@@ -273,6 +274,8 @@ class UnifiedAccountPolicy(AccountPolicy):
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
         margin_pct_schedule: dict[str, tuple[float, float]] | None = None,
         short_cash_policy: str = "credit",
+        *,
+        variation_assets: frozenset[str] | None = None,
     ) -> None:
         """Initialize unified account policy.
 
@@ -313,6 +316,7 @@ class UnifiedAccountPolicy(AccountPolicy):
                 f"'lock_notional', got {short_cash_policy}"
             )
         self.short_cash_policy = short_cash_policy
+        self.variation_assets = variation_assets or frozenset()
 
         overlapping_margin_assets = sorted(
             set(self.fixed_margin_schedule) & set(self.margin_pct_schedule)
@@ -532,6 +536,16 @@ class UnifiedAccountPolicy(AccountPolicy):
             # Cash account: never allow reversals
             return False, "Position reversal not allowed in cash account"
 
+        if self._uses_projected_margin(asset):
+            return self._validate_projected_margin(
+                asset,
+                current_quantity + order_quantity_delta,
+                price,
+                current_positions,
+                cash - commission,
+                multiplier=multiplier,
+            )
+
         # Simulate close: proceeds from closing the position
         close_proceeds = abs(current_quantity * price * multiplier)
 
@@ -604,6 +618,16 @@ class UnifiedAccountPolicy(AccountPolicy):
         if quantity < 0 and not self.allow_short_selling:
             return False, "Short selling not allowed in cash account"
 
+        if self._uses_projected_margin(asset):
+            return self._validate_projected_margin(
+                asset,
+                quantity,
+                price,
+                current_positions,
+                cash,
+                multiplier=multiplier,
+            )
+
         order_cost = abs(quantity * price * multiplier)
 
         if (
@@ -639,6 +663,44 @@ class UnifiedAccountPolicy(AccountPolicy):
                         f"Insufficient cash: need ${order_cost:.2f}, have ${cash:.2f}",
                     )
 
+        return True, ""
+
+    def _uses_projected_margin(self, asset: str) -> bool:
+        return self.allow_leverage and (
+            asset in self.variation_assets
+            or asset in self.fixed_margin_schedule
+            or asset in self.margin_pct_schedule
+        )
+
+    def _validate_projected_margin(
+        self,
+        asset: str,
+        quantity: float,
+        price: float,
+        positions: dict[str, Position],
+        cash: float,
+        *,
+        multiplier: float,
+    ) -> tuple[bool, str]:
+        equity = cash
+        required = self.get_margin_requirement(asset, quantity, price, multiplier=multiplier)
+        for key, position in positions.items():
+            mark = (
+                position.current_price
+                if position.current_price is not None
+                else position.entry_price
+            )
+            equity += position.market_value
+            if key == asset:
+                equity += position.quantity * (price - mark) * position.multiplier
+            else:
+                required += self.get_margin_requirement(
+                    key, position.quantity, mark, multiplier=position.multiplier
+                )
+        if not isfinite(equity) or not isfinite(required):
+            return False, "Projected margin and equity must be finite"
+        if required > equity + CASH_TOLERANCE:
+            return False, f"Insufficient margin: need ${required:.2f}, equity ${equity:.2f}"
         return True, ""
 
     def validate_position_change(
@@ -685,6 +747,16 @@ class UnifiedAccountPolicy(AccountPolicy):
                 pass
             else:
                 return True, ""
+
+        if self._uses_projected_margin(asset):
+            return self._validate_projected_margin(
+                asset,
+                new_quantity,
+                price,
+                current_positions,
+                cash,
+                multiplier=multiplier,
+            )
 
         if (
             not self.allow_leverage
