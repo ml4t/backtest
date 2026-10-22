@@ -478,3 +478,55 @@ def test_roll_artifact_preserves_mixed_equity_dividend_benchmark_and_variation_l
     ]:
         method = f"to_{name}_dataframe"
         assert getattr(restored, method)().equals(getattr(result, method)())
+
+
+@pytest.mark.parametrize("clock", ["decision_at", "available_at"])
+def test_missing_pandas_roll_clock_is_rejected_before_order_or_account_mutation(clock):
+    import pandas as pd
+
+    times = [t.replace(tzinfo=None) for t in TIMES]
+
+    class Roll(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("OLD", 1)
+            if timestamp == times[2]:
+                missing = pd.to_datetime(pd.Series([None]))[0]
+                with pytest.raises(ValueError, match="physical instants"):
+                    broker.roll_position("OLD", "NEW", roll_id="missing", **{clock: missing})
+                assert not broker.get_pending_orders()
+                assert broker.get_position("OLD").quantity == 1
+                assert broker.get_position("NEW") is None
+                assert broker.cash == 100000
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in times for _ in range(2)],
+                    "asset": ["OLD", "NEW"] * 6,
+                    "close": [100.0] * 12,
+                }
+            )
+        ),
+        Roll(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_leverage=True,
+            commission_rate=0,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            asset: ContractSpec(
+                asset,
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin=15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+            for asset in ["OLD", "NEW"]
+        },
+    ).run()
+    assert len(result.fills) == 1

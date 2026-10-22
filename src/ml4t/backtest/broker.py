@@ -2313,7 +2313,9 @@ class Broker:
         point = decision_at if decision_at is not None else now
         for value in (point, available_at):
             if value is not None and (
-                not isinstance(value, datetime) or (value.tzinfo is None) != (now.tzinfo is None)
+                not isinstance(value, datetime)
+                or value != value
+                or (value.tzinfo is None) != (now.tzinfo is None)
             ):
                 raise ValueError("Roll clocks require feed-compatible physical instants")
         if point > now or available_at is not None and available_at > point:

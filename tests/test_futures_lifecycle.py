@@ -207,3 +207,23 @@ def test_notice_after_captured_data_preserves_open_position_without_invented_ter
     ).run()
     assert len(result.fills) == 1
     assert result.to_holdings_dataframe()["quantity"][-1] == 1
+
+
+@pytest.mark.parametrize("clock", ["effective_at", "available_at"])
+def test_pandas_missing_lifecycle_timestamp_cannot_be_treated_as_a_known_boundary(clock):
+    import pandas as pd
+
+    from ml4t.backtest import FuturesLifecyclePolicy
+
+    args = {
+        "event_id": "e",
+        "asset": "capture:17",
+        "effective_at": TIMES[2].replace(tzinfo=None),
+        "available_at": TIMES[0].replace(tzinfo=None),
+        "reason": "expiration",
+        "source": "capture",
+        "revision_id": "r1",
+    }
+    args[clock] = pd.to_datetime(pd.Series([None]))[0]
+    with pytest.raises((TypeError, ValueError), match="known physical"):
+        FuturesLifecyclePolicy(**args)

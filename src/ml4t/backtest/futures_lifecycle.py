@@ -43,7 +43,9 @@ class FuturesLifecyclePolicy:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"Lifecycle {name} must be a nonempty string")
-        if not all(isinstance(t, datetime) for t in (self.effective_at, self.available_at)):
+        if any(
+            not isinstance(t, datetime) or t != t for t in (self.effective_at, self.available_at)
+        ):
             raise TypeError("Lifecycle clocks require known physical datetime instants")
         if (self.effective_at.tzinfo is None) != (self.available_at.tzinfo is None):
             raise ValueError("Lifecycle clocks require compatible timezone awareness")
