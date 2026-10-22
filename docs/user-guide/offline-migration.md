@@ -22,7 +22,7 @@ alone do not identify every source build below.
 
 Use a separate analysis environment with the built Backtest wheel and these
 producer/consumer sources. The
-[installed integration workflow](https://github.com/ml4t/backtest/blob/codex/reproducible-migration-workflows/.github/workflows/successor-integration.yml)
+[installed integration workflow](https://github.com/ml4t/backtest/blob/1c0771de23582b2851b942e1991c4fa0a39bda07/.github/workflows/successor-integration.yml)
 contains the exact installation commands. It tests Python 3.12 and 3.15 with
 isolated wheel imports. Core Backtest remains usable without the optional Data,
 Engineer and Diagnostic packages.

@@ -1,7 +1,10 @@
 """Causal Data selections must preserve dated identity through migration callbacks."""
 
+import json
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
+from runpy import run_path
 
 import polars as pl
 import pytest
@@ -18,7 +21,7 @@ def _no_fees(context):
     context.set_commission(us_futures=commission.PerFutureTrade(0))
 
 
-def _inputs(*, adjustment=None, offset=0, roll="volume"):
+def _inputs(*, adjustment=None, offset=0, roll="volume", notice=False):
     from ml4t.backtest.compat.zipline import ContinuousFuture, PreparedFutures
 
     futures = pytest.importorskip("ml4t.data.futures")
@@ -48,9 +51,13 @@ def _inputs(*, adjustment=None, offset=0, roll="volume"):
             definitions,
             as_of=as_of,
             feed_spec=SPEC,
-            roll_strategy=futures.HighestVolumeRoll()
-            if roll == "volume"
-            else futures.CalendarRoll(),
+            roll_strategy=(
+                futures.HighestVolumeRoll()
+                if roll == "volume"
+                else futures.FirstNoticeDateRoll(0, calendar="CME_Equity")
+                if notice
+                else futures.CalendarRoll()
+            ),
         )
 
     prepared = provider(as_of=TIMES[-1])
@@ -63,14 +70,21 @@ def _inputs(*, adjustment=None, offset=0, roll="volume"):
     return feed, assets, PreparedFutures(handle, provider, assets, "CME", "frozen-r1")
 
 
-@pytest.mark.parametrize("roll,expected", [("volume", [17, 23, 23, 23]), ("calendar", [17] * 4)])
+@pytest.mark.parametrize(
+    "roll,notice,expected",
+    [
+        ("volume", False, [17, 23, 23, 23]),
+        ("calendar", False, [17] * 4),
+        ("calendar", True, [17, 17, 23, 23]),
+    ],
+)
 def test_actual_data_current_chain_and_raw_contract_orders_keep_independent_dated_cash(
-    roll, expected
+    roll, notice, expected
 ):
     from ml4t.backtest.compat.zipline.api import continuous_future
     from ml4t.backtest.compat.zipline.finance import commission, slippage
 
-    feed, assets, source = _inputs(roll=roll)
+    feed, assets, source = _inputs(roll=roll, notice=notice)
     seen = []
 
     def initialize(context):
@@ -100,11 +114,15 @@ def test_actual_data_current_chain_and_raw_contract_orders_keep_independent_date
     ).attrs["backtest_result"]
     assert [sid for sid, _ in seen] == expected
     assert [price for _, price in seen] == [
-        4010,
-        4030 if roll == "volume" else 4020,
-        4040 if roll == "volume" else 4030,
-        4050 if roll == "volume" else 4040,
+        4010 + 10 * i + (10 if sid == 23 else 0) for i, sid in enumerate(expected)
     ]
+    if notice or roll == "volume":
+        reference = json.loads(
+            (Path(__file__).parent / "fixtures/dated_futures/zipline_3_2.json").read_text()
+        )
+        rows = next(c["trace"] for c in reference["cases"] if c["name"] == roll)
+        assert [sid for sid, _ in seen] == [r["selected_sid"] for r in rows[1:5]]
+        assert [price for _, price in seen] == [r["continuous_price"] for r in rows[1:5]]
     assert [(fill.asset, fill.price, fill.quantity) for fill in result.fills] == [
         ("capture:17", 4020, 1)
     ]
@@ -186,58 +204,18 @@ def test_colliding_continuous_research_keys_fail_before_initialize():
     assert not initialized
 
 
+@pytest.mark.parametrize("roll_marks", ["previous_session", "same_session"])
 @pytest.mark.parametrize("adjustment", [None, "add", "mul"])
-def test_data_adjusted_continuous_history_never_replaces_raw_execution_quotes(adjustment):
+def test_data_adjusted_continuous_history_never_replaces_raw_execution_quotes(
+    adjustment, roll_marks
+):
     from ml4t.backtest.compat.zipline.finance import slippage
 
-    futures = pytest.importorskip("ml4t.data.futures")
-    adjustments = pytest.importorskip("ml4t.data.futures.adjustment")
-    roll = pytest.importorskip("ml4t.data.futures.roll")
-    history = pytest.importorskip("ml4t.data.adjustments")
     feed, assets, source = _inputs(adjustment=adjustment)
     bars, _ = contract_inputs()
 
-    def provide(*, as_of, observation_before=None):
-        selected = []
-        known = bars.filter(pl.col("timestamp") <= as_of)
-        if observation_before is not None:
-            known = known.filter(pl.col("timestamp") < observation_before)
-        for point in known["timestamp"].unique().sort():
-            prepared = source.provider(as_of=point)
-            if prepared.selections.is_empty():
-                continue
-            identity = prepared.selections["selected_instrument_id"][0]
-            selected.append({"date": point.date(), "symbol": str(identity)})
-        raw = known.with_columns(
-            pl.col("timestamp").dt.date().alias("date"),
-            pl.col("asset").cast(pl.String).alias("symbol"),
-            *[pl.col("close").alias(name) for name in ["open", "high", "low"]],
-        )
-        selection = pl.DataFrame(selected)
-        events = roll.build_roll_events(raw, selection)
-        method = {
-            None: adjustments.NoAdjustment,
-            "add": adjustments.BackAdjustment,
-            "mul": adjustments.RatioAdjustment,
-        }[adjustment]()
-        continuous = method.adjust(raw.join(selection, on=["date", "symbol"]), events)
-        prices = continuous.select(
-            "timestamp",
-            pl.lit(as_of).alias("available_at"),
-            "source",
-            "revision_id",
-            pl.lit(source.handle.key).alias("asset"),
-            pl.col("adjusted_close").alias("close"),
-            "volume",
-        )
-        # Data owns adjustments and validates physical source availability again.
-        return history.prepare_adjusted_history(
-            prices,
-            None,
-            as_of=as_of,
-            feed_spec=SPEC.with_overrides(entity_col="asset"),
-            basis="raw",
-        )
+    recipe = run_path(str(Path(__file__).parents[1] / "examples/continuous_futures_migration.py"))
+    provide = recipe["continuous_history_provider"](bars, source, SPEC, roll_marks=roll_marks)
 
     observed = []
 
@@ -267,9 +245,19 @@ def test_data_adjusted_continuous_history_never_replaces_raw_execution_quotes(ad
         history_sources={"1d": "continuous-r1"},
         history_unit="observation",
     ).attrs["backtest_result"]
-    first = {None: 4010, "add": 4020, "mul": 4010 * 4030 / 4020}[adjustment]
+    first = {
+        None: 4010,
+        "add": 4020,
+        "mul": 4020 if roll_marks == "previous_session" else 4010 * 4030 / 4020,
+    }[adjustment]
     assert observed[0] == pytest.approx([first, 4030])
     assert observed[1:] == [[4030, 4040], [4040, 4050]]
+    if roll_marks == "previous_session":
+        reference = json.loads(
+            (Path(__file__).parent / "fixtures/dated_futures/zipline_3_2.json").read_text()
+        )
+        rows = next(c["trace"] for c in reference["cases"] if c["name"] == "volume")
+        assert observed == [r["adjusted_history"][str(adjustment)] for r in rows[2:5]]
     assert [(fill.asset, fill.price) for fill in result.fills] == [("capture:23", 4040)]
 
 
@@ -291,3 +279,26 @@ def test_actual_data_normalized_units_cannot_be_replaced_by_wrong_declared_contr
             handle_data=lambda _c, d: d.current(source.handle, "price"),
             runtime=RuntimeServices(start=TIMES[1]),
         )
+
+
+@pytest.mark.parametrize("adjustment", [None, "add", "mul"])
+def test_documented_continuous_workflow_saves_actual_snapshot_and_native_account(
+    adjustment, tmp_path
+):
+    storage = pytest.importorskip("ml4t.data.storage")
+    from ml4t.backtest import BacktestResult
+
+    recipe = run_path(str(Path(__file__).parents[1] / "examples/continuous_futures_migration.py"))
+    output = tmp_path / "continuous"
+    report = recipe["run"](output, adjustment=adjustment)
+    inputs = storage.read_snapshot(output / "inputs")
+    assert report["input_snapshot_id"] == inputs.snapshot_id
+    assert report["trace"][0]["history"] == ([4010, 4030] if adjustment is None else [4020, 4030])
+    assert [row["raw_price"] for row in report["trace"]] == [4030, 4040, 4050]
+    assert [row["chain"] for row in report["trace"]] == [["capture:23"]] * 3
+    result = BacktestResult.from_parquet(output / "result")
+    assert [(fill.asset, fill.price, fill.quantity) for fill in result.fills] == [
+        ("capture:23", 4040, 1)
+    ]
+    assert result.to_portfolio_state_dataframe()["cash"].to_list() == [100000, -102000, -102000]
+    assert result.to_equity_dataframe()["equity"].to_list() == [100000, 100000, 100500]

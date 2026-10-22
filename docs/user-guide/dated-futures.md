@@ -164,10 +164,11 @@ explicit `CME_Equity` event instants.
 ## Migrate an original Zipline futures workflow
 
 Original `continuous_future(root, offset=0, roll="volume", adjustment=None)`
-returns a research handle. Querying its selected contract does not itself roll a
-held position. Retain the selection operation in Data and pass the resulting
-immutable dated IDs to Backtest. Explicitly call `roll_position` when the strategy
-intends to move its position. The
+returns a research handle. The Backtest callback adapter now provides the same
+lookup through a registered `PreparedFutures` source. Querying its selected
+contract does not itself roll a held position. Retain the selection operation
+in Data and explicitly call `roll_position` when the strategy intends to move
+its position. The
 [callback adapter](migrate-from-zipline.md) can retain the surrounding strategy;
 it does not turn an adjusted series into a tradable instrument.
 
@@ -191,3 +192,77 @@ quotes therefore remain an explicit method difference, with an observable pendin
 order rather than an invented liquidation. The tested chain does not establish
 parity for arbitrary contract metadata, adjustments, delivery or exchange expiry
 settlement rules.
+
+## Retain continuous-futures callback reads
+
+Register `ContinuousFuture(key, root_symbol=..., offset=0, roll_style="volume",
+adjustment="mul")` and `PreparedFutures(handle, provider, contracts, exchange,
+source_id)` through `run_algorithm(continuous_futures=[source], ...)`.
+`contracts` maps original stable source IDs to declared dated `Future` objects
+that also appear in `assets`. The provider calls Data's `prepare_futures_inputs`
+with the actual requested `as_of`. The adapter checks the physical publication
+cutoffs, selected front, explicit ID mapping and normalized contract units.
+
+Inside callbacks, use the familiar API:
+
+```python
+from ml4t.backtest.compat.zipline.api import continuous_future
+
+def initialize(context):
+    context.cf = continuous_future("TEST", offset=0, roll="volume", adjustment="mul")
+
+def handle_data(context, data):
+    contract = data.current(context.cf, "contract")
+    chain = data.current_chain(context.cf)
+    if contract is not None and data.can_trade(context.cf):
+        price = data.current(context.cf, "price")
+        history = data.history(context.cf, "price", 2, "1d")
+```
+
+`offset` counts dated maturities after the selected front. It is not a volume
+rank. An exhausted chain returns `None` for `contract`, an empty chain, and NaN
+for price. Order the actual returned `Future`; ordering the research handle is
+an error. A changed research front alone leaves an existing position unchanged.
+
+Continuous history must come from a named prepared source. Declare its research
+keys with `RuntimeServices(history_assets={source_name: [handle.key]},
+history_sources={source_name: provider})`, and map the requested frequency using
+`run_algorithm(history_sources={"1d": source_name}, ...)`. These keys extend
+only the read service. They add no observations or tradable instruments to the
+execution feed. Undeclared keys and future or unpublished history are rejected.
+The declared source must prepare the handle's requested roll and adjustment.
+
+### Run the captured volume-roll migration
+
+With the pinned Data source from [the offline installation recipe](offline-migration.md)
+installed alongside this Backtest source build, run the complete synthetic example:
+
+```bash
+python -I examples/continuous_futures_migration.py ./continuous-example --adjustment mul
+```
+
+Use a new output directory for each `none`, `add` or `mul` run. The example
+captures immutable Data inputs, calls Data at each decision cutoff, prepares
+history through Data's adjustment APIs, runs the native callback engine, and
+saves the actual result plus `workflow.json`. The report retains the input
+snapshot ID, roll policy, adjustment, package versions, effective configuration,
+callback chain/history and actual fills. No RNG is used.
+
+The July 9 decision selects source ID 23 from July 8 volume. Raw current price
+is 4,030. Its two-bar history is `[4010, 4030]` without adjustment and
+`[4020, 4030]` with either adjustment in this example. A one-contract order
+submitted then fills on July 10 at the actual dated quote 4,040. The research
+series cannot supply its execution price.
+
+| Input policy | Tested meaning and migration choice |
+|---|---|
+| `HighestVolumeRoll` | Uses preceding observed-session volume. Its matching selections are checked against the captured Zipline 3.2 example. It does not reproduce every Zipline grace-period or no-flip-back rule for arbitrary chains. |
+| `CalendarRoll` | Data selects by expiration. To reproduce the captured original's July 10 auto-close-based selection, use actual first-notice facts and `FirstNoticeDateRoll(0, calendar="CME_Equity")`; that matching route is tested separately. |
+| `roll_marks="previous_session"` | The example's default supplies the preceding common session's old/new marks to Data's adjustment methods. This reproduces the captured original's additive and multiplicative histories. |
+| `roll_marks="same_session"` | Uses Data's `build_roll_events` switch-session paired marks. It is tested as a separate method; multiplicative history can differ from the original convention. |
+
+The preparation recipe is for the declared single-root daily synthetic input.
+Intraday aggregation, another chain's lifecycle rules, or a different quote scale
+requires its own Data preparation and matched validation. Keep executable
+lifecycle policies separate from research selection, as in the native example
+above. The adapter does not infer delivery or fabricate an expiry fill.

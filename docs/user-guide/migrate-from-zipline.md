@@ -1166,6 +1166,12 @@ volume. These adapter choices leave native Backtest defaults unchanged.
 
 ### Declare futures contracts and per-order costs
 
+For `continuous_future`, `data.current_chain`, and the selected dated contract,
+use the registered Data-backed route in
+[dated-futures migration](dated-futures.md#retain-continuous-futures-callback-reads).
+Its complete offline example covers raw, additive and multiplicative history,
+with explicit roll-mark conventions and separate raw-contract execution.
+
 Use `Future` for a dated contract whose root, multiplier and tick size are
 known. `PreparedAssetLookup` also builds these objects from Data's exported
 `zipline_futures` table. `future_symbol("ESH25")` resolves only declared

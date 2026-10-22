@@ -46,6 +46,7 @@ jobs:
           "$RUNNER_TEMP/consumer/bin/python" -I -m pytest
           tests/test_input_snapshot_workflow.py tests/test_migration_inputs.py
           tests/test_offline_migration.py tests/test_zipline_dated_reference.py
+          tests/test_zipline_continuous_futures.py tests/test_data_dated_rolls.py
           -o addopts='' --import-mode=importlib -W error -q
       - name: Run the documented offline CLI
         run: >-
@@ -56,4 +57,14 @@ jobs:
         with:
           name: installed-successor-${{ matrix.python }}-${{ github.sha }}
           path: ${{ runner.temp }}/offline-workflow
+          if-no-files-found: error
+      - name: Run the documented continuous-futures CLI
+        run: >-
+          "$RUNNER_TEMP/consumer/bin/python" -I examples/continuous_futures_migration.py
+          "$RUNNER_TEMP/continuous-workflow" --adjustment mul
+      - name: Retain continuous research and raw execution evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-continuous-${{ matrix.python }}-${{ github.sha }}
+          path: ${{ runner.temp }}/continuous-workflow
           if-no-files-found: error
