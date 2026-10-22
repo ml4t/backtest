@@ -20,7 +20,14 @@ TIMES = [datetime(2025, 3, 3, 21, tzinfo=UTC) + timedelta(days=i) for i in range
 
 
 def run_future(
-    quantity, *, mode="on_mark", settlements=None, legacy=False, runner="direct", sampling="bar"
+    quantity,
+    *,
+    mode="on_mark",
+    settlements=None,
+    legacy=False,
+    runner="direct",
+    sampling="bar",
+    config_options=None,
 ):
     reads = []
 
@@ -52,6 +59,7 @@ def run_future(
         commission_per_trade=2,
         slippage_rate=0,
         fixed_margin_schedule={"ES": (15000, 12000)},
+        **(config_options or {}),
     )
     kwargs = {} if settlements is None else {"settlement_events": settlements}
     if runner == "convenience":
@@ -77,6 +85,143 @@ def run_future(
         **kwargs,
     )
     return engine, engine.run(), reads
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        {"next_bar_submission_precheck": True},
+        {"next_bar_submission_precheck": True, "next_bar_simple_cash_check": True},
+        {"buying_power_reservation": True},
+        {"next_bar_queue_shadow_validation": True},
+        {
+            "next_bar_submission_precheck": True,
+            "next_bar_queue_shadow_validation": True,
+            "buying_power_reservation": True,
+        },
+    ],
+)
+@pytest.mark.parametrize("quantity", [1, -1])
+@pytest.mark.parametrize("mode", ["scheduled", "on_mark"])
+def test_public_submission_and_reservation_options_do_not_spend_futures_principal(
+    flags, quantity, mode
+):
+    _, result, reads = run_future(quantity, mode=mode, config_options=flags)
+    marked_cash = 99998 + quantity * 500 if mode == "on_mark" else 99998
+    assert reads == [100000, 99998, marked_cash, marked_cash]
+    assert len(result.fills) == 1
+    assert result.to_portfolio_state_dataframe()["initial_margin_required"][-1] == 15000
+
+
+@pytest.mark.parametrize("cash,filled", [(30004, 2), (30002, 1)])
+@pytest.mark.parametrize(
+    "flags",
+    [
+        {"next_bar_submission_precheck": True},
+        {"buying_power_reservation": True},
+        {"next_bar_queue_shadow_validation": True},
+        {"next_bar_submission_precheck": True, "buying_power_reservation": True},
+    ],
+)
+def test_projected_future_reservations_charge_fees_once_and_share_actual_margin(
+    cash, filled, flags
+):
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("ES", 1)
+                broker.submit_order("NQ", 1)
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in TIMES[:2] for _ in range(2)],
+                    "asset": ["ES", "NQ"] * 2,
+                    "close": [4000.0, 15000.0] * 2,
+                }
+            )
+        ),
+        Buy(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=cash,
+            allow_leverage=True,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+            fixed_margin_schedule={"ES": (15000, 12000), "NQ": (15000, 12000)},
+            **flags,
+        ),
+        contract_specs={
+            asset: ContractSpec(
+                asset,
+                asset_class=AssetClass.FUTURE,
+                multiplier=multiplier,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+            for asset, multiplier in [("ES", 50), ("NQ", 20)]
+        },
+    ).run()
+    assert len(result.fills) == filled
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == cash - filled * 2
+    assert result.to_portfolio_state_dataframe()["initial_margin_required"][-1] == filled * 15000
+
+
+@pytest.mark.parametrize("gap", [False, True])
+def test_intraday_reservation_refreshes_from_actual_gap_rejections_not_phantom_positions(gap):
+    times = [TIMES[0] + timedelta(minutes=15 * i) for i in range(3)]
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("ES", 1)
+            if timestamp == times[1]:
+                broker.submit_order("NQ", 1)
+
+    es_price = 10000.0 if gap else 4000.0
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in times for _ in range(2)],
+                    "asset": ["ES", "NQ"] * 3,
+                    "close": [4000.0, 100.0, es_price, 100.0, es_price, 100.0],
+                }
+            )
+        ),
+        Buy(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=20002,
+            allow_leverage=True,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+            next_bar_submission_precheck=True,
+        ),
+        contract_specs={
+            "ES": ContractSpec(
+                "ES",
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin_pct=(0.05, 0.04),
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            ),
+            "NQ": ContractSpec(
+                "NQ",
+                asset_class=AssetClass.FUTURE,
+                multiplier=20,
+                margin=15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            ),
+        },
+    ).run()
+    assert [fill.asset for fill in result.fills] == ["NQ" if gap else "ES"]
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == 20000
 
 
 @pytest.mark.parametrize("sampling", ["none", "bar", "session", "fill_and_session"])
@@ -256,7 +401,16 @@ def test_a_later_nonfinite_payout_cannot_leave_an_earlier_future_partially_settl
     assert engine._futures_ledger.records == []
 
 
-def test_two_scheduled_settlements_scale_in_partial_close_and_final_close_do_not_pay_twice():
+@pytest.mark.parametrize(
+    "flags",
+    [
+        {},
+        {"next_bar_submission_precheck": True},
+        {"buying_power_reservation": True},
+        {"next_bar_queue_shadow_validation": True},
+    ],
+)
+def test_two_scheduled_settlements_scale_in_partial_close_and_final_close_do_not_pay_twice(flags):
     times = [TIMES[0] + timedelta(days=i) for i in range(7)]
     cash = []
 
@@ -301,6 +455,7 @@ def test_two_scheduled_settlements_scale_in_partial_close_and_final_close_do_not
             commission_per_trade=2,
             slippage_rate=0,
             fixed_margin_schedule={"ES": (15000, 12000)},
+            **flags,
         ),
         contract_specs={
             "ES": ContractSpec(
@@ -685,6 +840,13 @@ def test_insufficient_initial_margin_rejects_without_fee_position_or_payout():
     assert not engine.broker.positions
     assert result.to_futures_settlements_dataframe().is_empty()
     assert any("margin" in order.rejection_reason.lower() for order in result.rejected_orders)
+
+
+def test_partial_entry_sizes_whole_futures_by_declared_margin_instead_of_principal():
+    _, result, reads = run_future(7, config_options={"partial_fills_allowed": True})
+    assert [fill.quantity for fill in result.fills] == [6]
+    assert reads == [100000, 99998, 102998, 102998]
+    assert result.to_portfolio_state_dataframe()["initial_margin_required"][-1] == 90000
 
 
 def test_single_cash_variation_account_cannot_sum_different_declared_currencies():

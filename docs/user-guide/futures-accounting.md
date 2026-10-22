@@ -146,6 +146,9 @@ price, then establishes the resulting position's basis. Scheduled settlement
 instead realizes the closed portion at a fill and leaves the remaining position's
 variation unpaid. Account reads never create transfers. Entry, scale-in, partial
 close and reversal fees are charged once through the existing fill ledger.
+Submission prechecks, buying-power reservations and queue validation use the same
+variation-basis fill rule. Legacy simple cash checks do not exchange futures
+principal; variation instruments use their declared margin requirements.
 
 The callback adapter uses its explicit unconstrained order-entry profile. It does
 not establish parity with a broker's collateral rules. Use native `Engine` with

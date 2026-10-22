@@ -1084,6 +1084,9 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "futures_submission_state": self._order_book.snapshot_submission_state()
+            if self.account.futures_methods is not None
+            else None,
             "futures_settlements_length": len(self._execution_journal.futures_settlements or []),
             "accounting_snapshots": dict(self._execution_journal.accounting_snapshots)
             if self._execution_journal.accounting_snapshots is not None
@@ -1229,6 +1232,8 @@ class Broker:
         if self._execution_journal.futures_settlements is not None:
             del self._execution_journal.futures_settlements[state["futures_settlements_length"] :]
         self._execution_journal.accounting_snapshots = state["accounting_snapshots"]
+        if state["futures_submission_state"] is not None:
+            self._order_book.restore_submission_state(state["futures_submission_state"])
 
         self._rebalance_counter = state["rebalance_counter"]
         if state["all_asset_stats"]:

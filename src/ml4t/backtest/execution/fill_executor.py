@@ -405,30 +405,21 @@ class FillExecutor:
 
         # Update cash (include multiplier for futures/derivatives)
         if self.account.futures_methods is not None and order.asset in self.account.futures_methods:
-            cash_change = -actual_commission
-            payout_quantity = 0.0
-            payout = 0.0
+            from .._variation import variation_fill
+
             mode = self.account.futures_methods[order.asset]
-            if mode == "on_mark" and old_quantity:
-                assert variation_basis is not None
-                payout_quantity = old_quantity
-                payout = old_quantity * (fill_price - variation_basis) * multiplier
-            elif old_quantity * signed_qty < 0:
-                assert variation_basis is not None
-                closed = min(abs(old_quantity), abs(signed_qty))
-                payout_quantity = closed * (1 if old_quantity > 0 else -1)
-                payout = payout_quantity * (fill_price - variation_basis) * multiplier
-            cash_change += payout
+            payout, payout_quantity, basis = variation_fill(
+                old_quantity,
+                variation_basis,
+                signed_qty,
+                position.quantity if position is not None else 0.0,
+                fill_price,
+                multiplier,
+                mode,
+            )
+            cash_change = payout - actual_commission
             if position is not None:
-                if mode == "on_mark" or old_quantity == 0 or old_quantity * position.quantity < 0:
-                    position.variation_basis = fill_price
-                elif old_quantity * signed_qty > 0:
-                    assert variation_basis is not None
-                    position.variation_basis = (
-                        old_quantity * variation_basis + signed_qty * fill_price
-                    ) / position.quantity
-                else:
-                    position.variation_basis = variation_basis
+                position.variation_basis = basis
             if payout_quantity:
                 settlements = self.journal.futures_settlements
                 assert settlements is not None
