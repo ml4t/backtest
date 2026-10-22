@@ -7,6 +7,7 @@ iteration time.
 
 from copy import deepcopy
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -15,6 +16,7 @@ from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
 from ._feature_signals import feature_signals
+from ._frame_inputs import input_frame
 from ._temporal import temporal_rows, timestamp_values
 
 
@@ -90,9 +92,9 @@ class DataFeed:
         prices_path: str | None = None,
         signals_path: str | None = None,
         context_path: str | None = None,
-        prices_df: pl.DataFrame | None = None,
+        prices_df: pl.DataFrame | pl.LazyFrame | pd.DataFrame | None = None,
         signals_df: pl.DataFrame | pl.LazyFrame | pd.DataFrame | None = None,
-        context_df: pl.DataFrame | None = None,
+        context_df: pl.DataFrame | pl.LazyFrame | pd.DataFrame | None = None,
         *,
         feed_spec: FeedSpec | Any | None = None,
         feature_spec: Any | None = None,
@@ -123,6 +125,7 @@ class DataFeed:
             corporate_actions.clone() if corporate_actions is not None else None
         )
         self.input_manifest = deepcopy(input_manifest)
+        self._input_provenance: dict[str, Any] | None = None
         if capital_flows is not None and not isinstance(capital_flows, pl.DataFrame):
             raise TypeError("capital_flows must be a Polars DataFrame")
         self.capital_flows = capital_flows.clone() if capital_flows is not None else None
@@ -136,7 +139,7 @@ class DataFeed:
             if path is not None and frame is not None:
                 raise ValueError(f"Pass either {label}_path or {label}_df, not both")
 
-        self.prices = (
+        price_input = (
             prices_df
             if prices_df is not None
             else (_read_parquet(prices_path) if prices_path else None)
@@ -146,14 +149,18 @@ class DataFeed:
             if signals_df is not None
             else (_read_parquet(signals_path) if signals_path else None)
         )
-        self.context = (
+        context_input = (
             context_df
             if context_df is not None
             else (_read_parquet(context_path) if context_path else None)
         )
 
-        if self.prices is None:
+        if price_input is None:
             raise ValueError("prices_path or prices_df required")
+        self.prices = input_frame(price_input, label="Prices panel")
+        self.context = (
+            input_frame(context_input, label="Context panel") if context_input is not None else None
+        )
 
         metadata = feed_spec if feed_spec is not None else contract
         raw_spec = (
@@ -228,6 +235,7 @@ class DataFeed:
         self._bid_size_col = self.feed_spec.bid_size_col
         self._ask_size_col = self.feed_spec.ask_size_col
 
+        self._validate_input_keys(self.prices, [self._timestamp_col, self._entity_col], "prices")
         self.prices, self._price_ranges_by_ts = self._index_by_timestamp(self.prices)
         if self.signals is not None:
             if self._entity_col not in self.signals.columns:
@@ -235,10 +243,14 @@ class DataFeed:
                     f"entity_col={self._entity_col!r} not found in signal columns "
                     f"{self.signals.columns}"
                 )
+            self._validate_input_keys(
+                self.signals, [self._timestamp_col, self._entity_col], "signals"
+            )
             self.signals, self._signal_ranges_by_ts = self._index_by_timestamp(self.signals)
         else:
             self._signal_ranges_by_ts = {}
         if self.context is not None:
+            self._validate_input_keys(self.context, [self._timestamp_col], "context")
             self.context, self._context_ranges_by_ts = self._index_by_timestamp(self.context)
         else:
             self._context_ranges_by_ts = {}
@@ -335,6 +347,125 @@ class DataFeed:
             f"{cls.ENTITY_COL_CANDIDATES}, got columns {columns}"
         )
 
+    def _validate_input_keys(self, frame: pl.DataFrame, keys: list[str], label: str) -> None:
+        for key in keys:
+            if key not in frame.columns:
+                parameter = "timestamp_col" if key == self._timestamp_col else "entity_col"
+                raise ValueError(
+                    f"{parameter}={key!r} not found in {label} columns {frame.columns}"
+                )
+            if frame[key].null_count():
+                raise ValueError(f"Null {label} key {key!r} cannot identify a simulation event")
+        if frame.select(keys).is_duplicated().any():
+            raise ValueError(f"Duplicate {label} keys cannot identify separate simulation events")
+
+    @classmethod
+    def from_snapshot(
+        cls,
+        path: str | Path,
+        *,
+        prices_table: str = "prices",
+        signals_table: str | None = None,
+        context_table: str | None = None,
+        corporate_actions_table: str | None = None,
+        capital_flows_table: str | None = None,
+        feature_spec: Any | None = None,
+        calendar: str | None | CalendarUnset = UNSET_CALENDAR,
+    ) -> "DataFeed":
+        """Verify an immutable Data snapshot before selecting explicitly named tables.
+
+        ML4T Data is optional and imported only for this route. Its public reader
+        verifies every declared file. Preserve its effective prepared calendar,
+        source manifest and selected table identities in the resulting run.
+        """
+        import importlib
+        import json
+        from hashlib import sha256
+
+        from ._input_provenance import frame_digest, validate_input_provenance
+
+        try:
+            module = importlib.import_module("ml4t.data.storage")
+        except ImportError as exc:
+            raise ImportError(
+                "DataFeed.from_snapshot requires ML4T Data with read_snapshot"
+            ) from exc
+        reader = getattr(module, "read_snapshot", None)
+        if not callable(reader):
+            raise ImportError("DataFeed.from_snapshot requires ML4T Data with read_snapshot")
+        snapshot = reader(path)
+        raw_manifest = (Path(path) / "manifest.json").read_bytes()
+        if json.loads(raw_manifest) != snapshot.manifest:
+            raise ValueError("Input snapshot manifest changed while its tables were read")
+        selected = {
+            role: name
+            for role, name in {
+                "prices": prices_table,
+                "signals": signals_table,
+                "context": context_table,
+                "corporate_actions": corporate_actions_table,
+                "capital_flows": capital_flows_table,
+            }.items()
+            if name is not None
+        }
+        if "prices" not in selected:
+            raise ValueError("A price snapshot table is required")
+        for name in selected.values():
+            if not isinstance(name, str) or name not in snapshot.tables:
+                raise ValueError(f"Unknown input snapshot table {name!r}")
+        entry = snapshot.manifest["content"]["tables"][prices_table]
+        clock = entry["clock"]
+        if not isinstance(clock, dict):
+            raise ValueError("A price snapshot requires an explicit FeedSpec clock")
+        spec = FeedSpec.from_any(clock["feed_spec"]).with_overrides(
+            time_contract_version=2,
+            calendar=clock["resolved_calendar"],
+        )
+        frames = {role: snapshot.tables[name] for role, name in selected.items()}
+        feed = cls(
+            prices_df=frames["prices"],
+            signals_df=frames.get("signals"),
+            context_df=frames.get("context"),
+            corporate_actions=frames.get("corporate_actions"),
+            capital_flows=frames.get("capital_flows"),
+            feed_spec=spec,
+            feature_spec=feature_spec,
+            calendar=calendar,
+            input_manifest=entry["metadata"],
+        )
+        provenance = {
+            "source": "ml4t.data.snapshot",
+            "snapshot_id": snapshot.snapshot_id,
+            "manifest_sha256": snapshot.manifest["manifest_sha256"],
+            "manifest_file_sha256": sha256(raw_manifest).hexdigest(),
+            "manifest": deepcopy(snapshot.manifest),
+            "consumed_tables": selected,
+            "normalized_tables_sha256": {
+                role: frame_digest(getattr(feed, role)) for role in selected
+            },
+            "normalized_table_format": "arrow-ipc-rechunked-v1",
+            "polars_version": pl.__version__,
+        }
+        validate_input_provenance(provenance)
+        feed._input_provenance = provenance
+        return feed
+
+    @property
+    def input_provenance(self) -> dict[str, Any] | None:
+        """Verified source manifest and explicit table selections, defensively copied."""
+        return deepcopy(self._input_provenance)
+
+    def verify_input_integrity(self) -> None:
+        """Reject changed verified tables; direct caller frames have no snapshot attestation."""
+        if self._input_provenance is None:
+            return
+        from ._input_provenance import frame_digest
+
+        for role, expected in self._input_provenance["normalized_tables_sha256"].items():
+            frame = getattr(self, role)
+            if not isinstance(frame, pl.DataFrame) or frame_digest(frame) != expected:
+                raise ValueError(f"Snapshot {role} changed after verified input preparation")
+
     def _index_by_timestamp(
         self, df: pl.DataFrame
     ) -> tuple[pl.DataFrame, dict[datetime, tuple[int, int]]]:
@@ -345,7 +476,7 @@ class DataFeed:
             )
 
         if not df[self._timestamp_col].is_sorted():
-            df = df.sort(self._timestamp_col)
+            df = df.sort(self._timestamp_col, maintain_order=True)
 
         timestamps = df.get_column(self._timestamp_col)
         if isinstance(timestamps.dtype, pl.Datetime) and timestamps.dtype.time_unit == "ns":
