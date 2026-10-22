@@ -237,3 +237,132 @@ def test_failed_roll_can_be_caught_without_leaving_orders_fees_or_phantom_margin
     assert sum(fill.commission for fill in result.fills) == 6
     with pytest.raises(ValueError, match="no captured"):
         result.to_rolls_dataframe()
+
+
+@pytest.mark.parametrize("finish", [False, True])
+def test_volume_limited_roll_retains_each_actual_partial_fill_and_final_completion(
+    finish, tmp_path
+):
+    from ml4t.backtest.execution import VolumeParticipationLimit
+
+    class Roll(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("OLD", 3)
+            if timestamp == TIMES[2]:
+                broker.roll_position("OLD", "NEW", roll_id="partial")
+
+    times = TIMES if finish else TIMES[:4]
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in times for _ in range(2)],
+                    "asset": ["OLD", "NEW"] * len(times),
+                    "close": [
+                        4000.0,
+                        4010.0,
+                        4000.0,
+                        4010.0,
+                        4010.0,
+                        4020.0,
+                        4020.0,
+                        4030.0,
+                        4030.0,
+                        4040.0,
+                        4040.0,
+                        4050.0,
+                    ][: len(times) * 2],
+                    "volume": [4.0] * (len(times) * 2),
+                }
+            )
+        ),
+        Roll(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_leverage=True,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            asset: ContractSpec(
+                asset,
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin=15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+            for asset in ["OLD", "NEW"]
+        },
+        execution_limits=VolumeParticipationLimit(max_participation=0.5),
+        holdings_sampling="bar",
+    ).run()
+    rolls = result.to_rolls_dataframe()
+    assert rolls["filled_quantity"].to_list() == [3 if finish else 2] * 2
+    assert rolls["roll_state"].to_list() == ["completed" if finish else "partial"] * 2
+    assert rolls["commission"].to_list() == [4 if finish else 2] * 2
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == (105488 if finish else 102492)
+    assert sum(f.commission for f in result.fills) == (12 if finish else 8)
+    result.to_parquet(tmp_path)
+    assert BacktestResult.from_parquet(tmp_path).to_rolls_dataframe().equals(rolls)
+
+
+def test_fractional_contract_roll_roundtrips_real_partial_fill_arithmetic(tmp_path):
+    from ml4t.backtest.config import ShareType
+    from ml4t.backtest.execution import VolumeParticipationLimit
+
+    times = [TIMES[0] + timedelta(minutes=i) for i in range(10)]
+
+    class Roll(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("OLD", 0.3)
+            if timestamp == times[3]:
+                broker.roll_position("OLD", "NEW", roll_id="fractional")
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in times for _ in range(2)],
+                    "asset": ["OLD", "NEW"] * len(times),
+                    "close": [4000.0] * (len(times) * 2),
+                    "volume": [0.2] * (len(times) * 2),
+                }
+            )
+        ),
+        Roll(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_leverage=True,
+            share_type=ShareType.FRACTIONAL,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            asset: ContractSpec(
+                asset,
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin=15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+            for asset in ["OLD", "NEW"]
+        },
+        execution_limits=VolumeParticipationLimit(max_participation=0.5),
+        holdings_sampling="bar",
+    ).run()
+    assert result.to_rolls_dataframe()["roll_state"].to_list() == ["completed"] * 2
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == 99982
+    result.to_parquet(tmp_path)
+    assert (
+        BacktestResult.from_parquet(tmp_path)
+        .to_rolls_dataframe()
+        .equals(result.to_rolls_dataframe())
+    )
