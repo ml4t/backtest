@@ -10,7 +10,8 @@ from ml4t.specs import WindowUnit
 from ..._temporal import temporal_rows
 from ...runtime import RuntimeServices
 from ...sessions import SessionConfig
-from .assets import Asset
+from .assets import Asset, Future
+from .continuous import ContinuousFuture, PreparedFutures
 from .csv import PreparedCSV
 from .window import _daily_history_close_offset
 
@@ -34,12 +35,15 @@ class BarData:
         csv_sources: Sequence[PreparedCSV] = (),
         restriction: Callable[[Asset, Any], bool] | None = None,
         read_policy: Literal["native", "zipline"] = "native",
+        continuous_futures: Sequence[PreparedFutures] = (),
     ) -> None:
         if history_view not in {"raw", "prepared"}:
             raise ValueError("history_view must be raw or prepared")
         if read_policy not in {"native", "zipline"}:
             raise ValueError("read_policy must be native or zipline")
         self._runtime = runtime
+        self._futures = {source.handle: source for source in continuous_futures}
+        self._futures_cache: dict[ContinuousFuture, tuple[Any, bool, Any]] = {}
         self._csv_sources = tuple(csv_sources)
         self._restriction = restriction
         self._read_policy = read_policy
@@ -110,6 +114,11 @@ class BarData:
         return market.current(assets, fields, **kwargs)
 
     def _current_value(self, asset, name):
+        if isinstance(asset, ContinuousFuture):
+            contract, _ = self._continuous_state(asset)
+            if name == "contract":
+                return contract
+            return float("nan") if contract is None else self._current_value(contract, name)
         if isinstance(asset, Asset) and name == "last_traded":
             return self._last_traded_value(asset)
         key = asset.key if isinstance(asset, Asset) else asset
@@ -164,6 +173,8 @@ class BarData:
         )
 
     def _market_value(self, asset, field, value, timestamp=None):
+        if isinstance(asset, ContinuousFuture):
+            return self._value(value)
         if self._read_policy == "zipline" and not self._alive(asset, timestamp):
             return 0 if field == "volume" else float("nan")
         return self._value(value)
@@ -198,15 +209,19 @@ class BarData:
             chosen, one = list(assets), False
         if any(not isinstance(asset, Asset) for asset in chosen):
             raise TypeError("Tradability queries require declared Assets")
-        flags = [
-            (
+
+        def tradable(asset):
+            if isinstance(asset, ContinuousFuture):
+                asset, _ = self._continuous_state(asset)
+                if asset is None:
+                    return False
+            return (
                 self._known_price_tradable(asset)
                 if self._read_policy == "zipline"
                 else market.can_trade(asset.key)
-            )
-            and not (self._restriction is not None and self._restriction(asset, market._asof))
-            for asset in chosen
-        ]
+            ) and not (self._restriction is not None and self._restriction(asset, market._asof))
+
+        flags = [tradable(asset) for asset in chosen]
         return flags[0] if one else pd.Series(flags, index=chosen, dtype=bool)
 
     def _known_price_tradable(self, asset):
@@ -228,6 +243,10 @@ class BarData:
             raise TypeError("Staleness queries require declared Assets")
 
         def stale(asset):
+            if isinstance(asset, ContinuousFuture):
+                asset, _ = self._continuous_state(asset)
+                if asset is None:
+                    return False
             if self._read_policy == "native":
                 return market.is_stale(asset.key)
             if not self._alive(asset):
@@ -249,7 +268,10 @@ class BarData:
             assets, fields, research=bool(self._csv_sources)
         )
         rows = {}
-        if not self._csv_sources:
+        individual = bool(self._csv_sources) or any(
+            isinstance(asset, ContinuousFuture) for asset in chosen
+        )
+        if not individual:
             raw = [name for name in names if name != "last_traded"]
             if raw:
                 frame = self._market_current(
@@ -263,7 +285,7 @@ class BarData:
             [
                 [
                     self._current_value(asset, name)
-                    if self._csv_sources
+                    if individual
                     else self._last_traded_value(asset)
                     if name == "last_traded"
                     else self._market_value(asset, name, rows.get(asset.key, {}).get(name))
@@ -294,6 +316,8 @@ class BarData:
             )
         if one_asset and one_field:
             value = result.iloc[0, 0]
+            if names[0] == "contract":
+                return value
             return float("nan") if value is None else value
         if one_asset:
             row = result.iloc[0].copy()
@@ -302,6 +326,34 @@ class BarData:
         if one_field:
             return result[names[0]]
         return result
+
+    def _continuous_source(self, handle: ContinuousFuture) -> PreparedFutures:
+        source = self._futures.get(handle)
+        if source is None or source.handle.query != handle.query:
+            raise ValueError("Continuous query must match its registered PreparedFutures source")
+        return source
+
+    def _continuous_state(self, handle: ContinuousFuture) -> tuple[Future | None, list[Future]]:
+        self._runtime.market._check_active()
+        source = self._continuous_source(handle)
+        market = self._runtime.market
+        cached = self._futures_cache.get(handle)
+        if cached is None or cached[:2] != (market._asof, market._inclusive):
+            assert market._asof is not None
+            cutoff = pd.Timestamp(market._asof)
+            if cutoff.tz is None:
+                assert self._runtime._engine is not None
+                cutoff = cutoff.tz_localize(self._runtime._engine.config.resolved_timezone)
+            state = source.at(cutoff, before_observation=not market._inclusive)
+            cached = (market._asof, market._inclusive, state)
+            self._futures_cache[handle] = cached
+        return cached[2]
+
+    def current_chain(self, continuous_future: ContinuousFuture) -> list[Future]:
+        """Return the prepared dated maturities from the selected front plus offset."""
+        if not isinstance(continuous_future, ContinuousFuture):
+            raise TypeError("current_chain requires a registered ContinuousFuture")
+        return list(self._continuous_state(continuous_future)[1])
 
     def _labels(self, times, frequency, config=None):
         engine = self._runtime._engine
@@ -340,6 +392,13 @@ class BarData:
         assert engine is not None
         market = self._runtime.market
         source = self._history_sources.get(frequency)
+        continuous = [asset for asset in chosen if isinstance(asset, ContinuousFuture)]
+        for asset in continuous:
+            self._continuous_source(asset)
+        if continuous and source is None:
+            raise ValueError(
+                "Continuous history requires registered handles and a named Data history source"
+            )
         if source is not None:
             market = self._runtime.history_source(source)
         config = market._history_config

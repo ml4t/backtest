@@ -40,6 +40,7 @@ from ...types import AssetClass, ContractSpec, Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from ._slippage import compile_slippage
 from .assets import Asset, Future
+from .continuous import ContinuousFuture, PreparedFutures
 from .controls import _register_account_controls, _TradingRule
 from .csv import PreparedCSV
 from .data import BarData
@@ -161,6 +162,7 @@ class MigrationContext:
         self._schedules: list[_Schedule] = []
         self._pipelines: dict[str, _PipelineState] = {}
         self._csv_sources: dict[str, PreparedCSV] = {}
+        self._continuous_futures: dict[tuple[str, int, str, str | None], ContinuousFuture] = {}
         self._active_csv: dict[str, PreparedCSV] = {}
         self._benchmark_input: BenchmarkData | None = None
         self._benchmark: BenchmarkData | None = None
@@ -249,6 +251,8 @@ class MigrationContext:
         return self._broker
 
     def _validate_asset(self, asset: Asset) -> None:
+        if isinstance(asset, ContinuousFuture):
+            raise TypeError("Order the actual dated Future returned by current(handle, 'contract')")
         if not isinstance(asset, Asset) or asset.key not in self._by_key:
             raise ValueError("Asset must belong to the explicit migration mapping")
 
@@ -297,6 +301,22 @@ class MigrationContext:
         if len(matches) != 1:
             raise ValueError(f"SID {sid!r} has no explicit asset mapping")
         return matches[0]
+
+    def continuous_future(
+        self,
+        root_symbol_str: str,
+        offset: int = 0,
+        roll: str = "volume",
+        adjustment: str | None = "mul",
+    ) -> ContinuousFuture:
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise ValueError("Continuous offset must be a nonnegative integer")
+        key = root_symbol_str, offset, roll, adjustment
+        if key not in self._continuous_futures:
+            raise ValueError(
+                "Register an explicit PreparedFutures source for this root/offset/roll/adjustment"
+            )
+        return self._continuous_futures[key]
 
     def future_symbol(self, symbol: str) -> Future:
         if not isinstance(symbol, str) or not symbol:
@@ -864,6 +884,7 @@ def run_algorithm(
     capital_base: float = 100000.0,
     runtime: RuntimeServices | None = None,
     csv_sources: Sequence[PreparedCSV] = (),
+    continuous_futures: Sequence[PreparedFutures] = (),
     benchmark: BenchmarkData | None = None,
     history_view: Literal["raw", "prepared"] = "raw",
     history_unit: WindowUnit | str | None = None,
@@ -890,6 +911,8 @@ def run_algorithm(
         raise ValueError("Declare assets or a PreparedAssetLookup")
     specs = dict(contract_specs or {})
     for asset in assets:
+        if isinstance(asset, ContinuousFuture):
+            raise ValueError("Declare continuous research keys in continuous_futures, not assets")
         if isinstance(asset, Future):
             declared = ContractSpec(
                 asset.key, AssetClass.FUTURE, multiplier=asset.multiplier, tick_size=asset.tick_size
@@ -939,6 +962,39 @@ def run_algorithm(
         "end": environment["end"].isoformat(),
     }
     context = MigrationContext(assets, config)
+    for source in continuous_futures:
+        if not isinstance(source, PreparedFutures):
+            raise TypeError("continuous_futures requires PreparedFutures declarations")
+        handle = source.handle
+        if (
+            handle.query in context._continuous_futures
+            or handle.key in context._by_key
+            or handle in context._continuous_futures.values()
+        ):
+            raise ValueError("Continuous source lookup or research key is ambiguous")
+        for contract in source.contracts.values():
+            known = context._by_key.get(contract.key)
+            if not isinstance(known, Future) or (
+                known.root_symbol,
+                known.multiplier,
+                known.tick_size,
+            ) != (contract.root_symbol, contract.multiplier, contract.tick_size):
+                raise ValueError("Continuous contracts must match registered dated Future units")
+        context._continuous_futures[handle.query] = handle
+    if continuous_futures:
+        config.metadata["migration_continuous_futures"] = [
+            {
+                "source_id": source.source_id,
+                "research_key": source.handle.key,
+                "query": list(source.handle.query),
+                "exchange": source.exchange,
+                "contracts": [
+                    {"source_id": identity, "native_key": asset.key, "legacy_sid": asset.legacy_sid}
+                    for identity, asset in source.contracts.items()
+                ],
+            }
+            for source in continuous_futures
+        ]
     if benchmark is not None and not isinstance(benchmark, BenchmarkData):
         raise TypeError("benchmark requires prepared BenchmarkData")
     context._benchmark_input = context._benchmark = benchmark
@@ -1026,6 +1082,7 @@ def run_algorithm(
                         history_view=history_view,
                         history_unit=history_unit,
                         history_sources=history_sources,
+                        continuous_futures=continuous_futures,
                     ),
                     handle_data,
                     runtime,

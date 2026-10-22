@@ -130,6 +130,7 @@ nav:
     - Corporate Actions: user-guide/corporate-actions.md
     - Futures Accounting: user-guide/futures-accounting.md
     - Dated Futures and Rolls: user-guide/dated-futures.md
+    - Offline Migration Workflow: user-guide/offline-migration.md
     - Rebalancing: user-guide/rebalancing.md
     - Data Feed: user-guide/data-feed.md
     - Results & Analysis: user-guide/results.md

@@ -761,6 +761,7 @@ class RuntimeServices:
         known_at_cols: dict[str, str] | None = None,
         history_provider: HistoryProvider | None = None,
         history_sources: Mapping[str, HistoryProvider] | None = None,
+        history_assets: Mapping[str, Sequence[str]] | None = None,
         signal_known_at_cols: dict[str, str] | None = None,
         context_known_at_cols: dict[str, str] | None = None,
         signal_eligible_cols: dict[str, str] | None = None,
@@ -792,6 +793,15 @@ class RuntimeServices:
         ):
             raise TypeError("history_sources requires nonempty source names and callable providers")
         self._history_views: dict[str, tuple[datetime, bool, MarketDataView]] = {}
+        self.history_assets = {name: tuple(keys) for name, keys in (history_assets or {}).items()}
+        if any(
+            name not in self.history_sources
+            or isinstance((history_assets or {})[name], str)
+            or any(not isinstance(key, str) or not key for key in keys)
+            or len(set(keys)) != len(keys)
+            for name, keys in self.history_assets.items()
+        ):
+            raise ValueError("history_assets requires unique research keys for registered sources")
         if inactive_position_policy not in {"retain_last_mark", "require_flat"}:
             raise ValueError("inactive_position_policy must be retain_last_mark or require_flat")
         if instruments is None and (
@@ -877,7 +887,11 @@ class RuntimeServices:
         cached = self._history_views.get(source_id)
         if cached is not None and cached[:2] == (market._asof, market._inclusive):
             return cached[2]
-        view = prepare_history_source(self, self.history_sources[source_id])
+        view = prepare_history_source(
+            self,
+            self.history_sources[source_id],
+            research_keys=self.history_assets.get(source_id, ()),
+        )
         self._history_views[source_id] = (market._asof, market._inclusive, view)
         return view
 

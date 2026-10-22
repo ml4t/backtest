@@ -246,6 +246,9 @@ class Engine:
         """
         if self._has_run:
             raise RuntimeError("Engine.run() was already started; create a new Engine for each run")
+        verify_inputs = getattr(self.feed, "verify_input_integrity", None)
+        if verify_inputs is not None:
+            verify_inputs()
         self._has_run = True
         if self._benchmark is not None:
             self._validate_benchmark_coverage()
@@ -253,6 +256,8 @@ class Engine:
             self.runtime._bind(self)
         try:
             result = self._run_once()
+            if verify_inputs is not None:
+                verify_inputs()
             if self._benchmark is not None:
                 result.benchmark = self._benchmark.select(
                     [time for time, _ in result.equity_curve],
@@ -1029,6 +1034,7 @@ class Engine:
                 accounting_observations=accounting_observations,
                 futures_settlements=futures_settlements,
                 futures_rolls=futures_rolls,
+                input_provenance=getattr(self.feed, "input_provenance", None),
                 holdings=observed_holdings,
                 observation_metadata=observation_metadata,
                 recorded_variables=self.broker._recorded_variables(),
@@ -1173,6 +1179,7 @@ class Engine:
             accounting_observations=accounting_observations,
             futures_settlements=futures_settlements,
             futures_rolls=futures_rolls,
+            input_provenance=getattr(self.feed, "input_provenance", None),
             holdings=observed_holdings,
             observation_metadata=observation_metadata,
             recorded_variables=self.broker._recorded_variables(),

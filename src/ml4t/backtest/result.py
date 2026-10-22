@@ -43,6 +43,7 @@ from ._futures_artifacts import (
     validate_futures_tables,
     validate_instrument_accounting,
 )
+from ._input_provenance import provenance_digest, validate_input_provenance
 from ._rolls import roll_digest, validate_rolls
 from ._temporal import temporal_frame, temporal_rows, timestamp_dtype
 
@@ -284,6 +285,7 @@ class BacktestResult:
     accounting_observations: list[AccountControlContext] | None = None
     futures_settlements: list[dict[str, Any]] | None = None
     futures_rolls: list[dict[str, Any]] | None = None
+    input_provenance: dict[str, Any] | None = None
 
     def to_rolls_dataframe(self) -> pl.DataFrame:
         """Return actual close/open order outcomes; paired execution is not atomic."""
@@ -1001,6 +1003,8 @@ class BacktestResult:
         )
         if self.predictions is not None:
             result["predictions"] = self.predictions
+        if self.input_provenance is not None:
+            result["input_provenance"] = self.input_provenance
         if self.equity is not None:
             result["equity"] = self.equity
         if self.trade_analyzer is not None:
@@ -1101,6 +1105,11 @@ class BacktestResult:
         Raises:
             ArtifactWriteError: If a requested component is unavailable or cannot be written.
         """
+        if self.input_provenance is not None:
+            try:
+                validate_input_provenance(self.input_provenance)
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactWriteError(f"Invalid input provenance: {exc}") from exc
         explicitly_selected = include is not None
         if self.account_method not in (None, "signed_notional", "per_instrument"):
             raise ArtifactWriteError("Unknown account_method")
@@ -1475,6 +1484,14 @@ class BacktestResult:
                 if benchmark_frame is not None
                 else {}
             ),
+            **(
+                {
+                    "input_provenance": self.input_provenance,
+                    "input_provenance_content_sha256": provenance_digest(self.input_provenance),
+                }
+                if self.input_provenance is not None
+                else {}
+            ),
             "library_version": __version__,
             "account_method": self.account_method,
             "initial_capital": self.initial_capital,
@@ -1666,6 +1683,19 @@ class BacktestResult:
                 else:
                     components = dict(component_data)
 
+        input_provenance = manifest.get("input_provenance") if manifest else None
+        input_digest = manifest.get("input_provenance_content_sha256") if manifest else None
+        if input_provenance is not None:
+            try:
+                validate_input_provenance(input_provenance)
+                if provenance_digest(input_provenance) != input_digest:
+                    raise ValueError(
+                        "Input provenance does not match its retained content identity"
+                    )
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactManifestError(f"Invalid input provenance: {exc}") from exc
+        elif input_digest is not None:
+            raise ArtifactManifestError("Input provenance declaration is missing")
         initial_capital = manifest.get("initial_capital") if manifest is not None else None
         account_method = manifest.get("account_method") if manifest else None
         if account_method not in (None, "signed_notional", "per_instrument"):
@@ -2352,6 +2382,7 @@ class BacktestResult:
             accounting_observations=accounting_observations if futures_declared else None,
             futures_settlements=futures_settlements,
             futures_rolls=futures_rolls,
+            input_provenance=input_provenance,
             benchmark=benchmark,
             benchmark_metadata=benchmark_metadata if benchmark is not None else None,
             corporate_actions=corporate_actions,

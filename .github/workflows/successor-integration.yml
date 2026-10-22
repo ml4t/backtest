@@ -1,0 +1,85 @@
+name: Successor Integration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: successor-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_NO_SOURCES: "1"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  installed:
+    name: Installed Data Engineer Diagnostic / ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Build the actual consumer wheel
+        run: uv build --wheel --out-dir wheelhouse
+      - name: Install immutable producer and analysis sources
+        run: |
+          uv venv --python "${{ matrix.python }}" "$RUNNER_TEMP/consumer"
+          uv pip install --python "$RUNNER_TEMP/consumer" \
+            wheelhouse/*.whl pytest -r validation/successor-integration-requirements.txt
+          uv pip check --python "$RUNNER_TEMP/consumer"
+      - name: Verify installed public workflows and legacy input conversion
+        run: >-
+          uv run --no-project --python "$RUNNER_TEMP/consumer" python -I -m pytest
+          tests/test_input_snapshot_workflow.py tests/test_migration_inputs.py
+          tests/test_offline_migration.py tests/test_zipline_dated_reference.py
+          tests/test_zipline_continuous_futures.py tests/test_data_dated_rolls.py
+          -o addopts='' --import-mode=importlib -W error -q
+          --junitxml="${{ runner.temp }}/successor-integration.xml"
+      - name: Require every pinned integration workflow to execute
+        env:
+          ML4T_SUCCESSOR_REPORT: ${{ runner.temp }}/successor-integration.xml
+        run: >-
+          uv run --no-project --python "$RUNNER_TEMP/consumer" python -I -c
+          "import os, xml.etree.ElementTree as ET;
+          root = ET.parse(os.environ['ML4T_SUCCESSOR_REPORT']).getroot();
+          assert root.findall('.//testcase') and not root.findall('.//testcase/skipped'),
+          'The pinned integration cohort must execute every selected workflow without skips'"
+      - name: Run the documented offline CLI
+        run: >-
+          uv run --no-project --python "$RUNNER_TEMP/consumer" python -I examples/offline_migration.py
+          "$RUNNER_TEMP/offline-workflow" --lazy
+      - name: Retain input and result identities
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-successor-${{ matrix.os }}-${{ matrix.python }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/offline-workflow
+            ${{ runner.temp }}/successor-integration.xml
+          if-no-files-found: error
+      - name: Run the documented continuous-futures CLI
+        run: >-
+          uv run --no-project --python "$RUNNER_TEMP/consumer" python -I examples/continuous_futures_migration.py
+          "$RUNNER_TEMP/continuous-workflow" --adjustment mul
+      - name: Retain continuous research and raw execution evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-continuous-${{ matrix.os }}-${{ matrix.python }}-${{ github.sha }}
+          path: ${{ runner.temp }}/continuous-workflow
+          if-no-files-found: error
