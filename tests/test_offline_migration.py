@@ -173,6 +173,9 @@ def test_actual_zipline_32_portable_result_uses_diagnostic_legacy_adapter_withou
         holdings = analysis.compute_holdings_analysis().timeline
         transactions = analysis.compute_transaction_analysis()
         summary = analysis.compute_summary_stats()
+    assert holdings["date"].to_list() == [
+        datetime(2025, 7, day, 21, tzinfo=UTC) for day in [7, 8, 9, 10, 11, 14]
+    ]
     assert holdings["cash"].to_list() == [100000, 100000, 100500, 101000, 101000, 101000]
     assert holdings["equity"].to_list() == [100000, 100000, 100500, 101000, 101000, 101000]
     assert holdings["gross_exposure"].to_list() == [0, 200500, 201000, 0, 0, 0]

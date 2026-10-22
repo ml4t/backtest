@@ -22,9 +22,14 @@ alone do not identify every source build below.
 
 Use a separate analysis environment with the built Backtest wheel and these
 producer/consumer sources. The
-[installed integration workflow](https://github.com/ml4t/backtest/blob/a5ef374be2154e0ee48266a9e78ee49702cbd99c/.github/workflows/successor-integration.yml)
+[installed integration workflow](https://github.com/ml4t/backtest/blob/main/.github/workflows/successor-integration.yml)
 contains the exact installation commands. It tests Python 3.12, 3.13 and 3.14
 on Linux, macOS and Windows with isolated wheel imports and no skipped workflows.
+The suite includes causal history, Pipeline, identity, lifecycle, controls and
+accounting paths using the real producers. Qualification uses Pandas 3.1 or later
+to exercise current calendar dependency compatibility.
+The Arrow-present cohort uses PyArrow 26 or later with Pandas 3.1 so legacy
+timestamp conversion avoids the deprecated timezone-dropping index accessor.
 Use that interpreter range for this pinned cohort: its Data and Diagnostic builds
 declare Python below 3.15. Backtest core Python 3.15 checks run separately.
 Core Backtest remains usable without the optional Data, Engineer and Diagnostic packages.
