@@ -133,12 +133,47 @@ def capture(case):
         data_frequency="daily",
         capital_base=100000,
     )
+    analysis_input = None
+    if case == "expiry":
+        analysis_input = {
+            "index": [timestamp.isoformat() for timestamp in perf.index],
+            "records": [
+                {
+                    "returns": float(row["returns"]),
+                    "portfolio_value": float(row["portfolio_value"]),
+                    "ending_cash": float(row["ending_cash"]),
+                    "positions": [
+                        {
+                            "sid": int(position["sid"]),
+                            "amount": float(position["amount"]),
+                            "last_sale_price": float(position["last_sale_price"]),
+                            "cost_basis": float(position["cost_basis"]),
+                        }
+                        for position in row["positions"]
+                    ],
+                    "transactions": [
+                        {
+                            "sid": int(transaction["sid"]),
+                            "amount": float(transaction["amount"]),
+                            "price": float(transaction["price"]),
+                            "dt": transaction["dt"].isoformat(),
+                            "commission": transaction.get("commission"),
+                        }
+                        for transaction in row["transactions"]
+                    ],
+                }
+                for _, row in perf.iterrows()
+            ],
+            "asset_metadata": {"17": {"symbol": "TESTN25", "multiplier": 50.0}},
+            "transport": "Actual original dataframe fields; asset objects become explicit integer SIDs. Reported returns are not reconstructed from NAV.",
+        }
     report["cases"].append(
         {
             "name": case,
             "trace": trace,
             "cash": perf.ending_cash.tolist(),
             "nav": perf.portfolio_value.tolist(),
+            **({"analysis_input": analysis_input} if analysis_input is not None else {}),
             "fills": [
                 {
                     "timestamp": f["dt"].isoformat(),

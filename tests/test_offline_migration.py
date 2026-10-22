@@ -119,3 +119,60 @@ def test_diagnostic_futures_exposure_does_not_become_principal_cash_or_nav_value
     assert executions["quantity"].to_list() == [1]
     assert executions["multiplier"].to_list() == [50]
     assert executions["filled_notional"].to_list() == [200000]
+
+
+def test_actual_zipline_32_portable_result_uses_diagnostic_legacy_adapter_without_runtime(
+    monkeypatch,
+):
+    import builtins
+    import json
+
+    import pandas as pd
+
+    legacy = pytest.importorskip("ml4t.diagnostic.integration.zipline")
+    from ml4t.specs import FeedSpec
+
+    original_import = builtins.__import__
+
+    def no_legacy_runtime(name, *args, **kwargs):
+        if (
+            name == "zipline"
+            or name.startswith("zipline.")
+            or name == "pyfolio"
+            or name.startswith("pyfolio.")
+        ):
+            raise ImportError("Legacy runtimes are deliberately unavailable for the consumer")
+        return original_import(name, *args, **kwargs)
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures/dated_futures/zipline_3_2.json").read_text()
+    )
+    case = next(c for c in fixture["cases"] if c["name"] == "expiry")
+    source = case["analysis_input"]
+    performance = pd.DataFrame.from_records(
+        source["records"], index=pd.to_datetime(source["index"])
+    )
+    metadata = {int(sid): value for sid, value in source["asset_metadata"].items()}
+    with monkeypatch.context() as context:
+        context.setattr(builtins, "__import__", no_legacy_runtime)
+        analysis = legacy.portfolio_analysis_from_zipline(
+            performance,
+            calendar=None,
+            periods_per_year=252,
+            feed_spec=FeedSpec(
+                time_contract_version=2, calendar="us_futures", timestamp_semantics="bar_close"
+            ),
+            asset_metadata=metadata,
+        )
+        holdings = analysis.compute_holdings_analysis().timeline
+        transactions = analysis.compute_transaction_analysis()
+        summary = analysis.compute_summary_stats()
+    assert holdings["cash"].to_list() == [100000, 100000, 100500, 101000, 101000, 101000]
+    assert holdings["equity"].to_list() == [100000, 100000, 100500, 101000, 101000, 101000]
+    assert holdings["gross_exposure"].to_list() == [0, 200500, 201000, 0, 0, 0]
+    assert summary.total_return == pytest.approx(0.01, abs=1e-14)
+    assert transactions.executions["asset"].to_list() == [17, 17]
+    assert transactions.executions["quantity"].to_list() == [1, -1]
+    assert transactions.executions["multiplier"].to_list() == [50, 50]
+    assert transactions.executions["filled_notional"].to_list() == [200500, 201500]
+    assert transactions.metrics["total_implementation_cost"] is None

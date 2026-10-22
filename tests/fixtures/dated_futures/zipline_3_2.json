@@ -293,6 +293,97 @@
         101000.0,
         101000.0
       ],
+      "analysis_input": {
+        "index": [
+          "2025-07-07T21:00:00+00:00",
+          "2025-07-08T21:00:00+00:00",
+          "2025-07-09T21:00:00+00:00",
+          "2025-07-10T21:00:00+00:00",
+          "2025-07-11T21:00:00+00:00",
+          "2025-07-14T21:00:00+00:00"
+        ],
+        "records": [
+          {
+            "returns": 0.0,
+            "portfolio_value": 100000.0,
+            "ending_cash": 100000.0,
+            "positions": [],
+            "transactions": []
+          },
+          {
+            "returns": 0.0,
+            "portfolio_value": 100000.0,
+            "ending_cash": 100000.0,
+            "positions": [
+              {
+                "sid": 17,
+                "amount": 1.0,
+                "last_sale_price": 4010.0,
+                "cost_basis": 4010.0
+              }
+            ],
+            "transactions": [
+              {
+                "sid": 17,
+                "amount": 1.0,
+                "price": 4010.0,
+                "dt": "2025-07-08T21:00:00+00:00",
+                "commission": null
+              }
+            ]
+          },
+          {
+            "returns": 0.004999999999999893,
+            "portfolio_value": 100500.0,
+            "ending_cash": 100500.0,
+            "positions": [
+              {
+                "sid": 17,
+                "amount": 1.0,
+                "last_sale_price": 4020.0,
+                "cost_basis": 4010.0
+              }
+            ],
+            "transactions": []
+          },
+          {
+            "returns": 0.004975124378109541,
+            "portfolio_value": 101000.0,
+            "ending_cash": 101000.0,
+            "positions": [],
+            "transactions": [
+              {
+                "sid": 17,
+                "amount": -1.0,
+                "price": 4030.0,
+                "dt": "2025-07-10T21:00:00+00:00",
+                "commission": null
+              }
+            ]
+          },
+          {
+            "returns": 0.0,
+            "portfolio_value": 101000.0,
+            "ending_cash": 101000.0,
+            "positions": [],
+            "transactions": []
+          },
+          {
+            "returns": 0.0,
+            "portfolio_value": 101000.0,
+            "ending_cash": 101000.0,
+            "positions": [],
+            "transactions": []
+          }
+        ],
+        "asset_metadata": {
+          "17": {
+            "symbol": "TESTN25",
+            "multiplier": 50.0
+          }
+        },
+        "transport": "Actual original dataframe fields; asset objects become explicit integer SIDs. Reported returns are not reconstructed from NAV."
+      },
       "fills": [
         {
           "timestamp": "2025-07-08T21:00:00+00:00",
