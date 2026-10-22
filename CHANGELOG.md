@@ -46,7 +46,8 @@
 
 - Expand installed successor qualification to actual causal history, Pipeline, identity,
   lifecycle, controls and account producer paths across Linux, macOS and Windows. Require every
-  selected workflow to execute without skips.
+  selected workflow to execute without skips. The Arrow-present cohort uses PyArrow 26 or later
+  with Pandas 3.1 to avoid deprecated timezone-dropping index access in older Arrow conversion.
 - Retain accepted performance measurements within their explicitly reviewed scope and unchanged
   output identities; no new speed claim or reference timing measurement is introduced.
 
