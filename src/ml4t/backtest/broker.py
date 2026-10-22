@@ -229,6 +229,8 @@ class Broker:
         }
         if futures_methods and not allow_leverage:
             raise ValueError("futures_variation requires a margin-enabled account")
+        if futures_methods and len({spec.currency for spec in (contract_specs or {}).values()}) > 1:
+            raise ValueError("A single cash variation account requires the same declared currency")
         policy: AccountPolicy = UnifiedAccountPolicy(
             allow_short_selling=allow_short_selling,
             allow_leverage=allow_leverage,

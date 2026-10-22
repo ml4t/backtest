@@ -578,3 +578,145 @@ def test_portable_future_payout_rejects_changed_cash_amount(tmp_path):
     ).write_parquet(path)
     with pytest.raises(ArtifactReadError, match="cash does not match"):
         BacktestResult.from_parquet(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "field,value,message",
+    [
+        ("currency", "EUR", "currency must match"),
+        ("available_at", TIMES[3] + timedelta(seconds=1), "before publication"),
+        ("settlement_price", float("nan"), "price must be finite"),
+        ("timestamp", TIMES[3].replace(tzinfo=None), "feed-compatible physical"),
+    ],
+)
+def test_invalid_settlement_terms_fail_before_any_strategy_order(field, value, message):
+    event = {
+        "timestamp": TIMES[3],
+        "available_at": TIMES[2],
+        "asset": "ES",
+        "settlement_price": 4010.0,
+        "currency": "USD",
+        "source": "declared-settlement",
+        "event_id": "day3",
+        "revision_id": "r1",
+    }
+    with pytest.raises(ValueError, match=message):
+        run_future(1, mode="scheduled", settlements=pl.DataFrame([{**event, field: value}]))
+    _, result, _ = run_future(1, mode="scheduled", settlements=pl.DataFrame([event]))
+    assert result.to_futures_settlements_dataframe()["cash_delta"].to_list() == [500]
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == 100498
+
+
+def test_retried_identical_settlement_pays_once_but_conflicting_revision_cannot_replace_it():
+    event = {
+        "timestamp": TIMES[3],
+        "available_at": TIMES[2],
+        "asset": "ES",
+        "settlement_price": 4010.0,
+        "currency": "USD",
+        "source": "declared-settlement",
+        "event_id": "day3",
+        "revision_id": "r1",
+    }
+    _, result, _ = run_future(1, mode="scheduled", settlements=pl.DataFrame([event, event]))
+    assert result.to_futures_settlements_dataframe()["cash_delta"].to_list() == [500]
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == 100498
+    with pytest.raises(ValueError, match="Conflicting or revised"):
+        run_future(
+            1,
+            mode="scheduled",
+            settlements=pl.DataFrame(
+                [
+                    event,
+                    {**event, "revision_id": "r2", "settlement_price": 4020.0},
+                ]
+            ),
+        )
+
+
+def test_actual_market_loss_records_margin_breach_without_fabricated_liquidation():
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("ES", 1)
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": TIMES,
+                    "asset": ["ES"] * 4,
+                    "close": [4000.0, 4000.0, 2100.0, 2100.0],
+                }
+            )
+        ),
+        Buy(),
+        BacktestConfig(
+            calendar=None,
+            allow_leverage=True,
+            initial_cash=100000,
+            commission_rate=0,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            "ES": ContractSpec(
+                "ES",
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin=15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+        },
+        holdings_sampling="bar",
+    ).run()
+    accounts = result.to_portfolio_state_dataframe()
+    assert accounts["cash"].to_list() == [100000, 100000, 5000, 5000]
+    assert accounts["margin_breach"].to_list() == [False, False, True, True]
+    assert accounts["available_funds"][-1] == -10000
+    assert len(result.fills) == 1
+    assert result.to_holdings_dataframe()["quantity"][-1] == 1
+
+
+def test_insufficient_initial_margin_rejects_without_fee_position_or_payout():
+    engine, result, reads = run_future(7)
+    assert reads == [100000] * 4
+    assert not result.fills
+    assert not engine.broker.positions
+    assert result.to_futures_settlements_dataframe().is_empty()
+    assert any("margin" in order.rejection_reason.lower() for order in result.rejected_orders)
+
+
+def test_single_cash_variation_account_cannot_sum_different_declared_currencies():
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            broker.submit_order("ES", 1)
+            broker.submit_order("FDAX", 1)
+
+    specs = {
+        asset: ContractSpec(
+            asset,
+            asset_class=AssetClass.FUTURE,
+            multiplier=multiplier,
+            currency=currency,
+            margin=1000,
+            accounting_method="futures_variation",
+            settlement_policy="on_mark",
+        )
+        for asset, multiplier, currency in [("ES", 50, "USD"), ("FDAX", 25, "EUR")]
+    }
+    with pytest.raises(ValueError, match="single.*currency|same.*currency"):
+        Engine(
+            DataFeed(
+                prices_df=pl.DataFrame(
+                    {
+                        "timestamp": [t for t in TIMES[:2] for _ in range(2)],
+                        "asset": ["ES", "FDAX"] * 2,
+                        "close": [4000.0, 19000.0, 4010.0, 19010.0],
+                    }
+                )
+            ),
+            Buy(),
+            BacktestConfig(calendar=None, allow_leverage=True),
+            contract_specs=specs,
+        ).run()

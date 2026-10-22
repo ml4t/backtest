@@ -143,6 +143,10 @@ class ContractSpec:
             and self.asset_class is not AssetClass.FUTURE
         ):
             raise ValueError("futures_variation requires a FUTURE instrument")
+        if self.accounting_method == "futures_variation" and (
+            not isinstance(self.currency, str) or not self.currency.strip()
+        ):
+            raise ValueError("futures_variation requires a declared currency")
 
 
 class ExitReason(str, Enum):
