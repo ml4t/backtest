@@ -99,6 +99,10 @@ def capture(case):
             "TEST", offset=0, roll=case if case != "expiry" else "calendar", adjustment=None
         )
         context.step = 0
+        context.adjusted = {
+            str(method): continuous_future("TEST", roll="volume", adjustment=method)
+            for method in [None, "add", "mul"]
+        }
 
     def handle(context, data):
         contract = data.current(context.cf, "contract")
@@ -109,6 +113,13 @@ def capture(case):
                 "timestamp": get_datetime().isoformat(),
                 "selected_sid": int(contract),
                 "continuous_price": float(data.current(context.cf, "price")),
+                "chain": [int(asset) for asset in data.current_chain(context.cf)],
+                "adjusted_history": {
+                    method: data.history(handle, "price", 2, "1d").tolist()
+                    for method, handle in context.adjusted.items()
+                }
+                if context.step
+                else None,
                 "cash": float(context.portfolio.cash),
                 "nav": float(context.portfolio.portfolio_value),
                 "positions": [

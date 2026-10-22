@@ -12,6 +12,11 @@
           "timestamp": "2025-07-07T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4000.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": null,
           "cash": 100000.0,
           "nav": 100000.0,
           "positions": []
@@ -20,6 +25,24 @@
           "timestamp": "2025-07-08T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4010.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4000.0,
+              4010.0
+            ],
+            "add": [
+              4000.0,
+              4010.0
+            ],
+            "mul": [
+              4000.0,
+              4010.0
+            ]
+          },
           "cash": 100000.0,
           "nav": 100000.0,
           "positions": [
@@ -34,6 +57,24 @@
           "timestamp": "2025-07-09T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4020.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4010.0,
+              4030.0
+            ],
+            "add": [
+              4020.0,
+              4030.0
+            ],
+            "mul": [
+              4020.0,
+              4030.0
+            ]
+          },
           "cash": 100500.0,
           "nav": 100500.0,
           "positions": [
@@ -48,6 +89,23 @@
           "timestamp": "2025-07-10T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4040.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4030.0,
+              4040.0
+            ],
+            "add": [
+              4030.0,
+              4040.0
+            ],
+            "mul": [
+              4030.0,
+              4040.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": [
@@ -62,6 +120,23 @@
           "timestamp": "2025-07-11T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4050.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4040.0,
+              4050.0
+            ],
+            "add": [
+              4040.0,
+              4050.0
+            ],
+            "mul": [
+              4040.0,
+              4050.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": []
@@ -70,6 +145,23 @@
           "timestamp": "2025-07-14T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4060.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4050.0,
+              4060.0
+            ],
+            "add": [
+              4050.0,
+              4060.0
+            ],
+            "mul": [
+              4050.0,
+              4060.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": []
@@ -113,6 +205,11 @@
           "timestamp": "2025-07-07T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4000.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": null,
           "cash": 100000.0,
           "nav": 100000.0,
           "positions": []
@@ -121,6 +218,24 @@
           "timestamp": "2025-07-08T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4010.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4000.0,
+              4010.0
+            ],
+            "add": [
+              4000.0,
+              4010.0
+            ],
+            "mul": [
+              4000.0,
+              4010.0
+            ]
+          },
           "cash": 100000.0,
           "nav": 100000.0,
           "positions": [
@@ -135,6 +250,23 @@
           "timestamp": "2025-07-09T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4030.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4010.0,
+              4030.0
+            ],
+            "add": [
+              4020.0,
+              4030.0
+            ],
+            "mul": [
+              4020.0,
+              4030.0
+            ]
+          },
           "cash": 100500.0,
           "nav": 100500.0,
           "positions": [
@@ -149,6 +281,23 @@
           "timestamp": "2025-07-10T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4040.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4030.0,
+              4040.0
+            ],
+            "add": [
+              4030.0,
+              4040.0
+            ],
+            "mul": [
+              4030.0,
+              4040.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": [
@@ -163,6 +312,23 @@
           "timestamp": "2025-07-11T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4050.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4040.0,
+              4050.0
+            ],
+            "add": [
+              4040.0,
+              4050.0
+            ],
+            "mul": [
+              4040.0,
+              4050.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": []
@@ -171,6 +337,23 @@
           "timestamp": "2025-07-14T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4060.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4050.0,
+              4060.0
+            ],
+            "add": [
+              4050.0,
+              4060.0
+            ],
+            "mul": [
+              4050.0,
+              4060.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": []
@@ -214,6 +397,11 @@
           "timestamp": "2025-07-07T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4000.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": null,
           "cash": 100000.0,
           "nav": 100000.0,
           "positions": []
@@ -222,6 +410,24 @@
           "timestamp": "2025-07-08T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4010.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4000.0,
+              4010.0
+            ],
+            "add": [
+              4000.0,
+              4010.0
+            ],
+            "mul": [
+              4000.0,
+              4010.0
+            ]
+          },
           "cash": 100000.0,
           "nav": 100000.0,
           "positions": [
@@ -236,6 +442,24 @@
           "timestamp": "2025-07-09T21:00:00+00:00",
           "selected_sid": 17,
           "continuous_price": 4020.0,
+          "chain": [
+            17,
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4010.0,
+              4030.0
+            ],
+            "add": [
+              4020.0,
+              4030.0
+            ],
+            "mul": [
+              4020.0,
+              4030.0
+            ]
+          },
           "cash": 100500.0,
           "nav": 100500.0,
           "positions": [
@@ -250,6 +474,23 @@
           "timestamp": "2025-07-10T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4040.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4030.0,
+              4040.0
+            ],
+            "add": [
+              4030.0,
+              4040.0
+            ],
+            "mul": [
+              4030.0,
+              4040.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": [
@@ -264,6 +505,23 @@
           "timestamp": "2025-07-11T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4050.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4040.0,
+              4050.0
+            ],
+            "add": [
+              4040.0,
+              4050.0
+            ],
+            "mul": [
+              4040.0,
+              4050.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": []
@@ -272,6 +530,23 @@
           "timestamp": "2025-07-14T21:00:00+00:00",
           "selected_sid": 23,
           "continuous_price": 4060.0,
+          "chain": [
+            23
+          ],
+          "adjusted_history": {
+            "None": [
+              4050.0,
+              4060.0
+            ],
+            "add": [
+              4050.0,
+              4060.0
+            ],
+            "mul": [
+              4050.0,
+              4060.0
+            ]
+          },
           "cash": 101000.0,
           "nav": 101000.0,
           "positions": []

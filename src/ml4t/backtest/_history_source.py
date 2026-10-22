@@ -1,5 +1,6 @@
 """Validate independent prepared grids before exposing native read services."""
 
+from collections.abc import Sequence
 from copy import deepcopy
 
 import pandas as pd
@@ -15,6 +16,7 @@ def prepare_history_source(
     provider: HistoryProvider,
     *,
     known_at_cols: dict[str, str] | None = None,
+    research_keys: Sequence[str] = (),
 ) -> MarketDataView:
     engine, market = runtime._engine, runtime.market
     assert engine is not None and market._asof is not None
@@ -74,7 +76,7 @@ def prepare_history_source(
         raise ValueError("Prepared history contains source revisions unavailable at the cutoff")
     if "is_imputed" in frame and frame["is_imputed"].fill_null(False).any():
         raise ValueError("Prepared history cannot promote imputed rows to observations")
-    if set(frame[spec.entity_col]) - set(market._rows):
+    if set(frame[spec.entity_col]) - set(market._rows) - set(research_keys):
         raise ValueError("Prepared history asset is outside the observed execution keys")
     # Use one physical clock for comparisons without rounding nanosecond source keys.
     timezone = engine.config.resolved_timezone
