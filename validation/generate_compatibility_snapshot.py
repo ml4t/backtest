@@ -62,6 +62,7 @@ def _canonical_type_text(value: str) -> str:
         .replace("pandas.core.frame.DataFrame", "pandas.DataFrame")
         .replace("pandas.core.series.Series", "pandas.Series")
         .replace("pandas._libs.tslibs.timestamps.Timestamp", "pandas.Timestamp")
+        .replace("pathlib._local.Path", "pathlib.Path")
     )
 
 
