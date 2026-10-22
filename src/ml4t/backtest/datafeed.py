@@ -357,7 +357,8 @@ class DataFeed:
             if frame[key].null_count():
                 raise ValueError(f"Null {label} key {key!r} cannot identify a simulation event")
         if frame.select(keys).is_duplicated().any():
-            raise ValueError(f"Duplicate {label} keys cannot identify separate simulation events")
+            subject = "bar" if label == "prices" else "event"
+            raise ValueError(f"duplicate {subject} in {label} input; keys must be unique")
 
     @classmethod
     def from_snapshot(
