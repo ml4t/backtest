@@ -6,7 +6,7 @@ from datetime import date, datetime
 from enum import Enum
 from math import inf, isfinite
 from numbers import Real
-from typing import Any
+from typing import Any, Literal
 
 # === Enums ===
 
@@ -127,9 +127,26 @@ class ContractSpec:
     margin: float | None = None  # Initial margin per contract (overrides account default)
     margin_pct: tuple[float, float] | None = None  # (initial, maintenance) fractions of notional
     currency: str = "USD"
+    accounting_method: Literal["signed_notional", "futures_variation"] = field(
+        default="signed_notional", kw_only=True
+    )
+    settlement_policy: Literal["scheduled", "on_mark"] = field(default="scheduled", kw_only=True)
 
     def __post_init__(self) -> None:
         _validated_multiplier(self.multiplier)
+        if self.accounting_method not in {"signed_notional", "futures_variation"}:
+            raise ValueError("Unknown instrument accounting_method")
+        if self.settlement_policy not in {"scheduled", "on_mark"}:
+            raise ValueError("settlement_policy must be scheduled or on_mark")
+        if (
+            self.accounting_method == "futures_variation"
+            and self.asset_class is not AssetClass.FUTURE
+        ):
+            raise ValueError("futures_variation requires a FUTURE instrument")
+        if self.accounting_method == "futures_variation" and (
+            not isinstance(self.currency, str) or not self.currency.strip()
+        ):
+            raise ValueError("futures_variation requires a declared currency")
 
 
 class ExitReason(str, Enum):
@@ -299,6 +316,7 @@ class Position:
     entry_slippage: float = 0.0  # Per-unit slippage on entry (for cost decomposition)
 
     _commission_adjusted_cost_basis: float | None = field(default=None, kw_only=True, repr=False)
+    variation_basis: float | None = field(default=None, kw_only=True)
 
     @property
     def commission_adjusted_cost_basis(self) -> float:
@@ -336,6 +354,8 @@ class Position:
             Market value = quantity × current_price
         """
         price = self.current_price if self.current_price is not None else self.entry_price
+        if self.variation_basis is not None:
+            return self.quantity * (price - self.variation_basis) * self.multiplier
         return self.quantity * price * self.multiplier
 
     def unrealized_pnl(self, current_price: float | None = None) -> float:

@@ -113,15 +113,14 @@ Common margin configurations:
 
 A contract multiplier changes notional exposure and price-move P&L. A fixed or
 percentage margin schedule constrains buying power; it does not select a
-variation-cash settlement method. The current leveraged ledger moves full signed
-notional through cash at fills, then includes the signed position market value
-in equity. A leveraged account's cash balance can therefore be negative.
+variation-cash settlement method. The default signed-notional ledger moves full
+notional through cash at fills and includes signed position market value in equity.
+A leveraged account's cash balance can therefore be negative.
 
-[The CFTC's mark-to-market definition](https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/CFTCGlossary/index.htm)
-describes daily futures cash flows from price changes. Backtest does not
-currently implement that variation-cash ledger. Compare cash, collateral and
-settlement timing separately when migrating a futures strategy; a matching
-terminal equity or contract P&L does not prove those fields match.
+For futures variation, select `ContractSpec(accounting_method="futures_variation")`
+and a declared settlement policy. The [futures-accounting guide](futures-accounting.md)
+runs both scheduled cash settlement and a mark-driven callback migration, with
+separate exposure, liquidation, collateral and available-funds observations.
 
 ## Using Engine Directly
 
@@ -200,8 +199,9 @@ quote. Read holdings exports for individual mark timestamps and sources.
 
 Position value is supplied directly by the marked ledger. It is not recovered
 by subtracting cash from rounded NAV. The current signed-notional account method
-has the same position value and net exposure; the futures cash limitation above
-still applies. Calling this getter does not add a bar or result observation.
+has the same position value and net exposure. Under explicit futures variation,
+position value includes unpaid P&L rather than principal notional. Calling this
+getter does not add a bar or result observation.
 Request a new snapshot after an event or fill when updated values are needed.
 
 <!-- ml4t-doc-test: native-account-snapshot -->

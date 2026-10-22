@@ -214,13 +214,13 @@ documents the tested `zipline_3_2` method. Arbitrary event columns in a price fr
 do not activate accounting. Adjusted bars alone do not reproduce raw share counts
 or payment entitlements. Match your event terms and method to the tested scope.
 
-Contract multipliers and fixed margin schedules support contract P&L and
-buying-power checks. Backtest's current leveraged ledger still moves full trade
-notional through cash and values the position at notional. It does not implement
-Zipline's futures variation-cash ledger. With $100,000 initial cash, buying one
-contract at 4,000 with a $50 multiplier moves $200,000 from cash into the
-position. A later 10-point rise adds $500 to equity; matching that equity does
-not establish cash-ledger parity. See [account policies](accounts.md).
+The native default remains signed-notional cash accounting. For migrated futures,
+declare `ContractSpec(accounting_method="futures_variation", settlement_policy="on_mark")`.
+The [futures-accounting guide](futures-accounting.md) runs callback orders through
+the native variation ledger. Its captured original 3.2.0 scenarios compare cash,
+NAV, basis, positions and fills, including fees and reversals. Scheduled exchange
+settlement is a separate explicit policy, with independent dollar oracles.
+Margin constrains entry; it does not select cash accounting or payout frequency.
 
 The retained CME workload contains continuous root series without a dated
 contract chain and roll map, so its Zipline comparison is explicitly unsupported.
@@ -359,7 +359,8 @@ This initial adapter does not yet implement
 the original Pipeline construction API. Use the [prepared panel route](#deliver-prepared-pipeline-results)
 for factor delivery and the [frozen CSV route](#register-an-offline-csv-source)
 for auxiliary inputs. [Raw corporate actions](corporate-actions.md) use explicit
-event inputs; futures variation-cash settlement remains separate unfinished work.
+event inputs; [futures variation](futures-accounting.md) requires an explicit
+per-instrument method and payout policy.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
 records it as not supplied unless prepared benchmark data is passed. An asset

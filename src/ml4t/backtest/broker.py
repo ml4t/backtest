@@ -222,6 +222,15 @@ class Broker:
                     effective_margin_pct_schedule[symbol] = spec.margin_pct
 
         # Create AccountState with UnifiedAccountPolicy
+        futures_methods = {
+            asset: spec.settlement_policy
+            for asset, spec in (contract_specs or {}).items()
+            if spec.accounting_method == "futures_variation"
+        }
+        if futures_methods and not allow_leverage:
+            raise ValueError("futures_variation requires a margin-enabled account")
+        if futures_methods and len({spec.currency for spec in (contract_specs or {}).values()}) > 1:
+            raise ValueError("A single cash variation account requires the same declared currency")
         policy: AccountPolicy = UnifiedAccountPolicy(
             allow_short_selling=allow_short_selling,
             allow_leverage=allow_leverage,
@@ -231,9 +240,11 @@ class Broker:
             fixed_margin_schedule=effective_margin_schedule or None,
             margin_pct_schedule=effective_margin_pct_schedule or None,
             short_cash_policy=short_cash_policy.value,
+            variation_assets=frozenset(futures_methods),
         )
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
+        self.account.futures_methods = futures_methods or None
         # Derive account_type string from flags for backward compat
         if allow_leverage:
             self.account_type = "margin"
@@ -556,6 +567,19 @@ class Broker:
         self._market_state.last_price_times = {}
         return ledger
 
+    def _create_futures_ledger(self, events, timestamps):
+        from .futures import FuturesLedger
+
+        if self.account.futures_methods is None:
+            if events is not None:
+                raise ValueError("settlement_events require declared futures_variation instruments")
+            return None
+        self._execution_journal.futures_settlements = []
+        self._execution_journal.accounting_snapshots = {}
+        return FuturesLedger(
+            self, events, timestamps, account=self.account, journal=self._execution_journal
+        )
+
     def _corporate_receivable_observations(self, account, metadata):
         snapshots = self._execution_journal.corporate_receivable_snapshots
         if snapshots is None:
@@ -567,11 +591,37 @@ class Broker:
             )
         ]
 
-    def _portfolio_snapshot(self, *, include_holdings: bool):
-        return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
+    def _portfolio_snapshot(
+        self, *, include_holdings: bool, observation_key: tuple[datetime, int] | None = None
+    ):
+        state, holdings, accounting = self._portfolio_ledger.snapshot(
+            include_holdings=include_holdings
+        )
+        if observation_key is not None and accounting is not None:
+            snapshots = self._execution_journal.accounting_snapshots
+            assert snapshots is not None
+            snapshots[observation_key] = accounting
+        return state, holdings
+
+    def _accounting_observations(self, account, metadata):
+        snapshots = self._execution_journal.accounting_snapshots
+        if snapshots is None:
+            return None
+        return [
+            snapshots[(row[0], observation[2])]
+            for row, observation in zip(
+                account, metadata or [("bar", False, None)] * len(account), strict=True
+            )
+        ]
 
     def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
-        state = self._portfolio_snapshot(include_holdings=include_holdings)
+        account, holdings, accounting = self._portfolio_ledger.snapshot(
+            include_holdings=include_holdings
+        )
+        if accounting is not None:
+            snapshots = self._execution_journal.accounting_snapshots
+            assert snapshots is not None
+            snapshots[(timestamp, None)] = accounting
         receivables = self._execution_journal.corporate_receivable_snapshots
         if receivables is not None:
             corporate = self.account.corporate
@@ -582,7 +632,7 @@ class Broker:
             rows = self._execution_journal.recorded_rows
             assert rows is not None
             rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
-        return state
+        return account, holdings
 
     def _observed_fill_accounts(self):
         return tuple(self._execution_journal.fill_snapshots or ())
@@ -1034,6 +1084,13 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "futures_submission_state": self._order_book.snapshot_submission_state()
+            if self.account.futures_methods is not None
+            else None,
+            "futures_settlements_length": len(self._execution_journal.futures_settlements or []),
+            "accounting_snapshots": dict(self._execution_journal.accounting_snapshots)
+            if self._execution_journal.accounting_snapshots is not None
+            else None,
             "completed_entitlements_length": len(
                 self._execution_journal.completed_corporate_entitlements or []
             ),
@@ -1172,6 +1229,11 @@ class Broker:
         ]
         if self._execution_journal.fill_snapshots is not None:
             del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
+        if self._execution_journal.futures_settlements is not None:
+            del self._execution_journal.futures_settlements[state["futures_settlements_length"] :]
+        self._execution_journal.accounting_snapshots = state["accounting_snapshots"]
+        if state["futures_submission_state"] is not None:
+            self._order_book.restore_submission_state(state["futures_submission_state"])
 
         self._rebalance_counter = state["rebalance_counter"]
         if state["all_asset_stats"]:
@@ -1692,9 +1754,11 @@ class Broker:
 
     def get_account_snapshot(self) -> AccountControlContext:
         """Return one immutable, currently marked native account observation."""
-        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
+        (equity, cash, gross, net, _), _holdings, accounting = self._portfolio_ledger.snapshot(
             include_holdings=False
         )
+        if accounting is not None:
+            return accounting
         return AccountControlContext(
             self._market_state.time, equity, cash, gross, net, positions_value=net
         )

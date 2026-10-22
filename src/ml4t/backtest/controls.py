@@ -195,6 +195,13 @@ class AccountControlContext:
     gross_exposure: float
     net_exposure: float
     positions_value: float | None = field(default=None, kw_only=True)
+    initial_margin_required: float | None = field(default=None, kw_only=True)
+    maintenance_margin_required: float | None = field(default=None, kw_only=True)
+    available_funds: float | None = field(default=None, kw_only=True)
+    futures_unsettled_pnl: float | None = field(default=None, kw_only=True)
+    settlement_holds: float | None = field(default=None, kw_only=True)
+    cash_buffer: float | None = field(default=None, kw_only=True)
+    margin_breach: bool | None = field(default=None, kw_only=True)
 
     @property
     def leverage(self) -> float:

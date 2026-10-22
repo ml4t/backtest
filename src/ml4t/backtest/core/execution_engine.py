@@ -368,7 +368,23 @@ class ExecutionEngine:
             order=order,
             multiplier=broker.get_multiplier(order.asset),
         )
-        shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
+        basis = None
+        if self.account.futures_methods is not None and order.asset in self.account.futures_methods:
+            from .._variation import variation_fill
+
+            position = shadow_positions.get(order.asset)
+            payout, _quantity, basis = variation_fill(
+                current_qty,
+                position.variation_basis if position is not None else None,
+                qty_delta,
+                new_qty,
+                fill_price,
+                broker.get_multiplier(order.asset),
+                self.account.futures_methods[order.asset],
+            )
+            shadow_cash += payout - commission
+        else:
+            shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
 
         if abs(new_qty) <= quantity_zero_tolerance(current_qty, qty_delta):
             shadow_positions.pop(order.asset, None)
@@ -386,6 +402,7 @@ class ExecutionEngine:
                 entry_time=current_time,
                 current_price=self.market.prices.get(order.asset, fill_price),
                 multiplier=broker.get_multiplier(order.asset),
+                variation_basis=basis,
             )
             return shadow_cash
 
@@ -395,6 +412,7 @@ class ExecutionEngine:
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
         position.quantity = new_qty
+        position.variation_basis = basis
         position.current_price = self.market.prices.get(order.asset, fill_price)
         if abs(current_qty) <= quantity_zero_tolerance(current_qty) or is_reversal:
             position.entry_price = fill_price
@@ -657,6 +675,10 @@ class ExecutionEngine:
             and broker.execution_mode is ExecutionMode.NEXT_BAR
             and broker.next_bar_simple_cash_check
             and order.order_type is OrderType.MARKET
+            and (
+                self.account.futures_methods is None
+                or order.asset not in self.account.futures_methods
+            )
         )
 
     def _eligible_orders(

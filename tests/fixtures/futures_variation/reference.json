@@ -1,0 +1,881 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "source_revision": "cf649ac06fddce76f6caa2403cd8494ac84f72ad",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "scope": "Actual Future asset, explicit original us_futures daily clock, next-bar NoSlippage and zero commissions. Mark-driven variation reference, not exchange scheduled settlement or margin-model parity.",
+  "producer": "c3b9db80a66397420fb27adeccc762559dd41e07",
+  "timing_claim": false,
+  "prices": [
+    4000.0,
+    4000.0,
+    4010.0,
+    4020.0,
+    4010.0,
+    4030.0
+  ],
+  "cases": [
+    {
+      "name": "long",
+      "order_plan": {
+        "0": 1
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 101500.0,
+          "nav": 101500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4030.0
+            }
+          ]
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        100500.0,
+        101500.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        100500.0,
+        101500.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 1.0,
+          "price": 4000.0
+        }
+      ]
+    },
+    {
+      "name": "short",
+      "order_plan": {
+        "0": -1
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 4000.0,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 99500.0,
+          "nav": 99500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 4000.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 99000.0,
+          "nav": 99000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 4000.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 99500.0,
+          "nav": 99500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 4000.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 98500.0,
+          "nav": 98500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 4000.0,
+              "mark": 4030.0
+            }
+          ]
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        99500.0,
+        99000.0,
+        99500.0,
+        98500.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        99500.0,
+        99000.0,
+        99500.0,
+        98500.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": -1.0,
+          "price": 4000.0
+        }
+      ]
+    },
+    {
+      "name": "long_close",
+      "order_plan": {
+        "0": 1,
+        "3": -1
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.0,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        100500.0,
+        100500.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        100500.0,
+        101000.0,
+        100500.0,
+        100500.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 1.0,
+          "price": 4000.0
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "sid": 8,
+          "quantity": -1.0,
+          "price": 4010.0
+        }
+      ]
+    },
+    {
+      "name": "scale_partial_flip",
+      "order_plan": {
+        "0": 2,
+        "2": 1,
+        "3": -1,
+        "4": -4
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "basis": 4000.0,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 101000.0,
+          "nav": 101000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "basis": 4000.0,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 102000.0,
+          "nav": 102000.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 3.0,
+              "basis": 4006.6666666666665,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 100500.0,
+          "nav": 100500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "basis": 4006.6666666666665,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 102500.0,
+          "nav": 102500.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -2.0,
+              "basis": 4030.0,
+              "mark": 4030.0
+            }
+          ]
+        }
+      ],
+      "cash": [
+        100000.0,
+        100000.0,
+        101000.0,
+        102000.0,
+        100500.0,
+        102500.0
+      ],
+      "nav": [
+        100000.0,
+        100000.0,
+        101000.0,
+        102000.0,
+        100500.0,
+        102500.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 2.0,
+          "price": 4000.0
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 1.0,
+          "price": 4020.0
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "sid": 8,
+          "quantity": -1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "sid": 8,
+          "quantity": -4.0,
+          "price": 4030.0
+        }
+      ]
+    },
+    {
+      "name": "long_per_future_trade_2",
+      "order_plan": {
+        "0": 1
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 99998.0,
+          "nav": 99998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 100498.0,
+          "nav": 100498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 100998.0,
+          "nav": 100998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 100498.0,
+          "nav": 100498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 101498.0,
+          "nav": 101498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4030.0
+            }
+          ]
+        }
+      ],
+      "cash": [
+        100000.0,
+        99998.0,
+        100498.0,
+        100998.0,
+        100498.0,
+        101498.0
+      ],
+      "nav": [
+        100000.0,
+        99998.0,
+        100498.0,
+        100998.0,
+        100498.0,
+        101498.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 1.0,
+          "price": 4000.0
+        }
+      ],
+      "fee_per_order": 2.0
+    },
+    {
+      "name": "short_per_future_trade_2",
+      "order_plan": {
+        "0": -1
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 99998.0,
+          "nav": 99998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 3999.96,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 99498.0,
+          "nav": 99498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 3999.96,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 98998.0,
+          "nav": 98998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 3999.96,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 99498.0,
+          "nav": 99498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 3999.96,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 98498.0,
+          "nav": 98498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -1.0,
+              "basis": 3999.96,
+              "mark": 4030.0
+            }
+          ]
+        }
+      ],
+      "cash": [
+        100000.0,
+        99998.0,
+        99498.0,
+        98998.0,
+        99498.0,
+        98498.0
+      ],
+      "nav": [
+        100000.0,
+        99998.0,
+        99498.0,
+        98998.0,
+        99498.0,
+        98498.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": -1.0,
+          "price": 4000.0
+        }
+      ],
+      "fee_per_order": 2.0
+    },
+    {
+      "name": "long_close_per_future_trade_2",
+      "order_plan": {
+        "0": 1,
+        "3": -1
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 99998.0,
+          "nav": 99998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 100498.0,
+          "nav": 100498.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 100998.0,
+          "nav": 100998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 1.0,
+              "basis": 4000.04,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 100496.0,
+          "nav": 100496.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 100496.0,
+          "nav": 100496.0,
+          "positions": []
+        }
+      ],
+      "cash": [
+        100000.0,
+        99998.0,
+        100498.0,
+        100998.0,
+        100496.0,
+        100496.0
+      ],
+      "nav": [
+        100000.0,
+        99998.0,
+        100498.0,
+        100998.0,
+        100496.0,
+        100496.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 1.0,
+          "price": 4000.0
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "sid": 8,
+          "quantity": -1.0,
+          "price": 4010.0
+        }
+      ],
+      "fee_per_order": 2.0
+    },
+    {
+      "name": "scale_partial_flip_per_future_trade_2",
+      "order_plan": {
+        "0": 2,
+        "2": 1,
+        "3": -1,
+        "4": -4
+      },
+      "trace": [
+        {
+          "timestamp": "2025-03-03T22:00:00+00:00",
+          "cash": 100000.0,
+          "nav": 100000.0,
+          "positions": []
+        },
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "cash": 99998.0,
+          "nav": 99998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "basis": 4000.02,
+              "mark": 4000.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-05T22:00:00+00:00",
+          "cash": 100998.0,
+          "nav": 100998.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "basis": 4000.02,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "cash": 101996.0,
+          "nav": 101996.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 3.0,
+              "basis": 4006.693333333334,
+              "mark": 4020.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "cash": 100494.0,
+          "nav": 100494.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": 2.0,
+              "basis": 4006.713333333334,
+              "mark": 4010.0
+            }
+          ]
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "cash": 102492.0,
+          "nav": 102492.0,
+          "positions": [
+            {
+              "sid": 8,
+              "quantity": -2.0,
+              "basis": 4029.98,
+              "mark": 4030.0
+            }
+          ]
+        }
+      ],
+      "cash": [
+        100000.0,
+        99998.0,
+        100998.0,
+        101996.0,
+        100494.0,
+        102492.0
+      ],
+      "nav": [
+        100000.0,
+        99998.0,
+        100998.0,
+        101996.0,
+        100494.0,
+        102492.0
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-03-04T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 2.0,
+          "price": 4000.0
+        },
+        {
+          "timestamp": "2025-03-06T22:00:00+00:00",
+          "sid": 8,
+          "quantity": 1.0,
+          "price": 4020.0
+        },
+        {
+          "timestamp": "2025-03-07T22:00:00+00:00",
+          "sid": 8,
+          "quantity": -1.0,
+          "price": 4010.0
+        },
+        {
+          "timestamp": "2025-03-10T21:00:00+00:00",
+          "sid": 8,
+          "quantity": -4.0,
+          "price": 4030.0
+        }
+      ],
+      "fee_per_order": 2.0
+    }
+  ],
+  "snapshot_id": "0b6ff2ce85320ae35b2ef1a27cfe5d89b1710a4aa3443ab7bb1fb74d59f84513",
+  "native_declarations": {
+    "currency": "Caller explicitly declares USD for these synthetic contracts, separate from unknown exported currency.",
+    "publication": "Synthetic daily quotes explicitly become known at the actual original handle_data clocks; raw Data snapshot unknown publication fields are preserved.",
+    "margin": "The adapter uses its explicit unconstrained order-entry profile. Native15000/12000margin is independently tested through Engine; no reference margin-model parity is claimed."
+  },
+  "commission_comparison": "Original zero-cost and PerFutureTrade(2) runs use the identical Data snapshot. Compare complete cash/NAV/positions/fills; original per-transaction commission is not captured as an allocated charge here. Native actual fill fees remain explicit."
+}

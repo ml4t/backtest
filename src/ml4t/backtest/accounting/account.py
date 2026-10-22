@@ -54,6 +54,7 @@ class AccountState:
         self.positions: dict[str, Position] = {}
         self.policy = policy
         self.corporate: CorporateState | None = None
+        self.futures_methods: dict[str, str] | None = None
 
         # Settlement tracking: holds are (settle_bar, amount) pairs
         self._settlement_holds: deque[tuple[int, float]] = deque()
