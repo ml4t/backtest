@@ -678,6 +678,7 @@ class TestBacktestResultParquet:
 
             assert manifest["omitted_components"] == {
                 "futures_settlements": "futures variation was not captured",
+                "futures_rolls": "futures roll intents were not captured",
                 "corporate_actions": "corporate-action applications were not captured",
                 "corporate_entitlements": "corporate entitlements were not captured",
                 "holdings": "holdings were not captured",

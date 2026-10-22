@@ -43,6 +43,7 @@ from ._futures_artifacts import (
     validate_futures_tables,
     validate_instrument_accounting,
 )
+from ._rolls import roll_digest, validate_rolls
 from ._temporal import temporal_frame, temporal_rows, timestamp_dtype
 
 try:
@@ -66,6 +67,7 @@ _ARTIFACT_SCHEMA_VERSION = 3
 _BENCHMARK_ARTIFACT_SCHEMA_VERSION = 4
 _ACTION_ARTIFACT_SCHEMA_VERSION = 5
 _FUTURES_ARTIFACT_SCHEMA_VERSION = 6
+_ROLL_ARTIFACT_SCHEMA_VERSION = 7
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -84,6 +86,7 @@ _COMPONENT_FILES = {
     "corporate_actions": "corporate_actions.parquet",
     "corporate_entitlements": "corporate_entitlements.parquet",
     "futures_settlements": "futures_settlements.parquet",
+    "futures_rolls": "futures_rolls.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -987,6 +990,7 @@ class BacktestResult:
                 "instrument_accounting": self.instrument_accounting,
                 "accounting_observations": self.accounting_observations,
                 "futures_settlements": self.futures_settlements,
+                "futures_rolls": self.futures_rolls,
                 "holdings": self.holdings,
                 "holdings_sampling": self.holdings_sampling,
                 "observation_metadata": self.observation_metadata,
@@ -1131,6 +1135,8 @@ class BacktestResult:
             unavailable["corporate_entitlements"] = "corporate entitlements were not captured"
         if self.futures_settlements is None:
             unavailable["futures_settlements"] = "futures variation was not captured"
+        if self.futures_rolls is None:
+            unavailable["futures_rolls"] = "futures roll intents were not captured"
         if self.config is None:
             unavailable["config"] = "result has no config"
             unavailable["spec"] = "result has no config for a runtime spec"
@@ -1141,6 +1147,14 @@ class BacktestResult:
             raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
 
         selected = [name for name in requested if name not in unavailable]
+        rolls_hash = None
+        if self.futures_rolls is not None:
+            try:
+                rolls = self.to_rolls_dataframe()
+                validate_rolls(rolls, self.fills)
+                rolls_hash = roll_digest(rolls)
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactWriteError(f"Invalid futures roll ledger: {exc}") from exc
         futures_hash = None
         if self.instrument_accounting is not None:
             try:
@@ -1393,7 +1407,12 @@ class BacktestResult:
             )
             written[name] = component_path
 
-        for component in ("corporate_actions", "corporate_entitlements", "futures_settlements"):
+        for component in (
+            "corporate_actions",
+            "corporate_entitlements",
+            "futures_settlements",
+            "futures_rolls",
+        ):
             if component in selected:
                 target = path / _COMPONENT_FILES[component]
                 frame = (
@@ -1402,7 +1421,11 @@ class BacktestResult:
                     else (
                         self.to_entitlements_dataframe()
                         if component == "corporate_entitlements"
-                        else self.to_futures_settlements_dataframe()
+                        else (
+                            self.to_futures_settlements_dataframe()
+                            if component == "futures_settlements"
+                            else self.to_rolls_dataframe()
+                        )
                     )
                 )
                 write_component(
@@ -1415,17 +1438,22 @@ class BacktestResult:
 
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
-            "schema_version": _FUTURES_ARTIFACT_SCHEMA_VERSION
-            if self.instrument_accounting is not None
+            "schema_version": _ROLL_ARTIFACT_SCHEMA_VERSION
+            if self.futures_rolls is not None
             else (
-                _ACTION_ARTIFACT_SCHEMA_VERSION
-                if self.corporate_actions is not None
+                _FUTURES_ARTIFACT_SCHEMA_VERSION
+                if self.instrument_accounting is not None
                 else (
-                    _BENCHMARK_ARTIFACT_SCHEMA_VERSION
-                    if self.benchmark is not None
-                    else _ARTIFACT_SCHEMA_VERSION
+                    _ACTION_ARTIFACT_SCHEMA_VERSION
+                    if self.corporate_actions is not None
+                    else (
+                        _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+                        if self.benchmark is not None
+                        else _ARTIFACT_SCHEMA_VERSION
+                    )
                 )
             ),
+            **({"roll_content_sha256": rolls_hash} if rolls_hash is not None else {}),
             **(
                 {
                     "instrument_accounting": self.instrument_accounting,
@@ -1462,6 +1490,7 @@ class BacktestResult:
                 | ({"recorded_variables"} if self.recorded_variables is not None else set())
                 | ({"benchmark"} if self.benchmark is not None else set())
                 | ({"futures_settlements"} if self.instrument_accounting is not None else set())
+                | ({"futures_rolls"} if self.futures_rolls is not None else set())
                 | (
                     {"corporate_actions", "corporate_entitlements"}
                     if self.corporate_actions is not None
@@ -1594,10 +1623,11 @@ class BacktestResult:
                 _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
                 _ACTION_ARTIFACT_SCHEMA_VERSION,
                 _FUTURES_ARTIFACT_SCHEMA_VERSION,
+                _ROLL_ARTIFACT_SCHEMA_VERSION,
             ):
                 raise UnsupportedArtifactVersionError(
                     f"Unsupported result artifact schema version {schema_version!r}; "
-                    "supported versions are 2, 3, 4, 5 and 6"
+                    "supported versions are 2, 3, 4, 5, 6 and 7"
                 )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
@@ -1640,7 +1670,14 @@ class BacktestResult:
         account_method = manifest.get("account_method") if manifest else None
         if account_method not in (None, "signed_notional", "per_instrument"):
             raise ArtifactManifestError("Unknown account_method")
-        futures_declared = manifest is not None and manifest.get("schema_version") == 6
+        rolls_declared = (
+            manifest is not None and manifest.get("schema_version") == _ROLL_ARTIFACT_SCHEMA_VERSION
+        )
+        futures_declared = manifest is not None and (
+            manifest.get("schema_version") == _FUTURES_ARTIFACT_SCHEMA_VERSION
+            or rolls_declared
+            and account_method == "per_instrument"
+        )
         instrument_accounting = manifest.get("instrument_accounting") if manifest else None
         if futures_declared:
             try:
@@ -1650,7 +1687,7 @@ class BacktestResult:
             except ValueError as exc:
                 raise ArtifactManifestError(str(exc)) from exc
         elif account_method == "per_instrument" or instrument_accounting is not None:
-            raise ArtifactManifestError("Per-instrument accounting requires schema version 6")
+            raise ArtifactManifestError("Per-instrument accounting requires schema version 6 or 7")
         returns_include_commissions = (
             manifest.get("returns_include_commissions") if manifest else None
         )
@@ -1688,10 +1725,11 @@ class BacktestResult:
             _REQUIRED_RESULT_COMPONENTS
             | ({"benchmark"} if benchmark_declared else set())
             | ({"futures_settlements"} if futures_declared else set())
-        )
+        ) | ({"futures_rolls"} if rolls_declared else set())
         actions_declared = manifest is not None and (
             manifest.get("schema_version") == _ACTION_ARTIFACT_SCHEMA_VERSION
-            or futures_declared
+            or manifest.get("schema_version")
+            in {_FUTURES_ARTIFACT_SCHEMA_VERSION, _ROLL_ARTIFACT_SCHEMA_VERSION}
             and manifest.get("corporate_action_content_sha256") is not None
         )
         if actions_declared:
@@ -1700,6 +1738,10 @@ class BacktestResult:
             raise ArtifactManifestError("Corporate actions require schema version 5 provenance")
         if not futures_declared and "futures_settlements" in components:
             raise ArtifactManifestError("Futures settlements require schema version 6 provenance")
+        if not rolls_declared and (
+            "futures_rolls" in components or manifest and "roll_content_sha256" in manifest
+        ):
+            raise ArtifactManifestError("Futures rolls require schema version 7 provenance")
         missing_required_components = sorted(required_components - components.keys())
         missing_files = sorted(
             name for name, filename in components.items() if not (path / filename).is_file()
@@ -1722,6 +1764,7 @@ class BacktestResult:
                         "corporate_actions",
                         "corporate_entitlements",
                         "futures_settlements",
+                        "futures_rolls",
                     }
                 )
                 - components.keys()
@@ -2046,8 +2089,9 @@ class BacktestResult:
                 _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
                 _ACTION_ARTIFACT_SCHEMA_VERSION,
                 _FUTURES_ARTIFACT_SCHEMA_VERSION,
+                _ROLL_ARTIFACT_SCHEMA_VERSION,
             ):
-                raise ValueError("Prepared benchmark requires artifact schema version 4, 5 or 6")
+                raise ValueError("Prepared benchmark requires artifact schema version 4, 5, 6 or 7")
             if _benchmark_digest(frame) != manifest.get("benchmark_content_sha256"):
                 raise ValueError("Prepared benchmark content does not match its retained digest")
             probe = cls(
@@ -2270,6 +2314,20 @@ class BacktestResult:
             if settlement_table is None:
                 raise ArtifactReadError("Declared futures variation ledger is missing")
             futures_settlements = list(temporal_rows(settlement_table, named=True))
+        futures_rolls = None
+        if rolls_declared:
+            rolls_table = read_component("futures_rolls", pl.read_parquet, None)
+            if rolls_table is None:
+                raise ArtifactReadError("Declared futures roll ledger is missing")
+            try:
+                validate_rolls(rolls_table, fills)
+                if manifest is None or roll_digest(rolls_table) != manifest.get(
+                    "roll_content_sha256"
+                ):
+                    raise ValueError("Roll content identity does not match its manifest")
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactReadError(f"Invalid futures roll ledger: {exc}") from exc
+            futures_rolls = list(temporal_rows(rolls_table, named=True))
 
         result = cls(
             trades=trades,
@@ -2293,6 +2351,7 @@ class BacktestResult:
             instrument_accounting=instrument_accounting,
             accounting_observations=accounting_observations if futures_declared else None,
             futures_settlements=futures_settlements,
+            futures_rolls=futures_rolls,
             benchmark=benchmark,
             benchmark_metadata=benchmark_metadata if benchmark is not None else None,
             corporate_actions=corporate_actions,

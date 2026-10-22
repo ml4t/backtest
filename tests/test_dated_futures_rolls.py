@@ -5,16 +5,28 @@ from datetime import UTC, datetime, timedelta
 import polars as pl
 import pytest
 
-from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
+from ml4t.backtest import (
+    AssetClass,
+    BacktestConfig,
+    BacktestResult,
+    ContractSpec,
+    DataFeed,
+    Engine,
+    Strategy,
+)
 from ml4t.backtest.config import CommissionType, ExecutionMode
 from ml4t.backtest.controls import OrderConstraints, TradingControlViolation
+from ml4t.backtest.result import ArtifactReadError
 
 TIMES = [datetime(2025, 3, 3, 21, tzinfo=UTC) + timedelta(days=i) for i in range(6)]
 
 
 @pytest.mark.parametrize("direction", [1, -1])
 @pytest.mark.parametrize("scenario", ["complete", "missing_new_quote", "rejected_open"])
-def test_dated_roll_links_actual_legs_and_fees_without_using_adjustment_marks(direction, scenario):
+@pytest.mark.parametrize("legacy", [False, True], ids=["variation", "signed-notional"])
+def test_dated_roll_links_actual_legs_and_fees_without_using_adjustment_marks(
+    direction, scenario, legacy, tmp_path
+):
     orders = []
 
     class Roll(Strategy):
@@ -80,8 +92,14 @@ def test_dated_roll_links_actual_legs_and_fees_without_using_adjustment_marks(di
                 margin=200000
                 if scenario == "rejected_open" and asset == "capture:ESM25"
                 else 15000,
-                accounting_method="futures_variation",
-                settlement_policy="on_mark",
+                **(
+                    {}
+                    if legacy
+                    else {
+                        "accounting_method": "futures_variation",
+                        "settlement_policy": "on_mark",
+                    }
+                ),
             )
             for asset in ["capture:ESH25", "capture:ESM25"]
         },
@@ -103,7 +121,10 @@ def test_dated_roll_links_actual_legs_and_fees_without_using_adjustment_marks(di
         + direction * (2000 if scenario == "complete" else 1000)
         - (6 if scenario == "complete" else 4)
     )
-    assert result.to_portfolio_state_dataframe()["cash"][-1] == closing
+    expected_cash = (
+        closing - direction * 4050 * 50 if legacy and scenario == "complete" else closing
+    )
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == expected_cash
     assert result.to_equity_dataframe()["equity"][-1] == closing
     rolls = result.to_rolls_dataframe()
     assert rolls["roll_id"].to_list() == ["selection-1", "selection-1"]
@@ -121,6 +142,17 @@ def test_dated_roll_links_actual_legs_and_fees_without_using_adjustment_marks(di
     )
     assert rolls["commission"].to_list() == [2, 2 if scenario == "complete" else 0]
     assert rolls["filled_at"].to_list() == [TIMES[3], TIMES[3] if scenario == "complete" else None]
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.to_rolls_dataframe().equals(rolls)
+    table = tmp_path / "futures_rolls.parquet"
+    rolls.with_columns((pl.col("commission") + 1).alias("commission")).write_parquet(table)
+    with pytest.raises(ArtifactReadError, match="fees disagree"):
+        BacktestResult.from_parquet(tmp_path)
+    if scenario != "complete":
+        rolls.with_columns(pl.lit("completed").alias("roll_state")).write_parquet(table)
+        with pytest.raises(ArtifactReadError, match="completion status"):
+            BacktestResult.from_parquet(tmp_path)
 
 
 @pytest.mark.parametrize("immediate", [False, True])
