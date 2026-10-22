@@ -72,24 +72,43 @@ class _Positions(Mapping[Asset, PositionView]):
     def __init__(self, context: MigrationContext):
         self.context = context
 
+    def _flat_distributions(self):
+        broker = self.context._require_broker()
+        corporate = broker.account.corporate
+        if corporate is None:
+            return {}
+        return {
+            key: basis
+            for key, (_index, basis) in corporate.flat_deliveries.items()
+            if key not in broker.positions
+        }
+
     def __getitem__(self, asset: Asset) -> PositionView:
         self.context._validate_asset(asset)
         position = self.context._require_broker().get_position(asset.key)
+        flat = self._flat_distributions().get(asset.key) if position is None else None
+        if flat is not None:
+            broker = self.context._require_broker()
+            mark = broker.get_mark_price(asset.key)
+            if mark is None:
+                mark = broker.get_last_price(asset.key)
+            return PositionView(asset, 0.0, flat, mark if mark is not None else 0.0)
+
         return PositionView(
             asset,
             position.quantity if position is not None else 0,
             position.commission_adjusted_cost_basis if position is not None else 0.0,
-            (position.current_price if position.current_price is not None else position.entry_price)
+            self.context._require_broker()._portfolio_ledger.position_mark(asset.key, position)[0]
             if position is not None
             else 0.0,
         )
 
     def __iter__(self) -> Iterator[Asset]:
         positions = self.context._require_broker().get_positions()
-        return iter(self.context._by_key[key] for key in positions)
+        return iter(self.context._by_key[key] for key in [*positions, *self._flat_distributions()])
 
     def __len__(self) -> int:
-        return len(self.context._require_broker().get_positions())
+        return len(self.context._require_broker().get_positions()) + len(self._flat_distributions())
 
 
 class _Portfolio:
@@ -579,14 +598,19 @@ class MigrationContext:
             self._external_order_id(order.order_id),
             order.order_id,
             self._by_key[order.asset],
-            sign * order.requested_quantity,
+            sign
+            * (
+                order.action_adjusted_quantity
+                if order.action_adjusted_quantity is not None
+                else order.requested_quantity
+            ),
             sign * order.filled_quantity,
             order.commission_paid,
             statuses[order.status],
             utc(order.created_at),
             utc(max(observed)) if observed else None,
             order.limit_price,
-            order.stop_price,
+            None if order.stop_triggered else order.stop_price,
             order.stop_triggered,
             order.rejection_reason,
         )
@@ -889,6 +913,7 @@ def run_algorithm(
         execution_price=ExecutionPrice.CLOSE,
         next_bar_execution_price=ExecutionPrice.CLOSE,
         conditional_order_mode=ConditionalOrderMode.EXECUTION_PRICE,
+        corporate_action_policy="zipline_3_2",
         fill_ordering=FillOrdering.FIFO,
         metadata={
             "migration_adapter": "zipline",

@@ -538,11 +538,45 @@ class Broker:
         if after_fill:
             self._execution_journal.fill_snapshots = []
 
+    def _create_corporate_action_ledger(self, frame, manifest, config, timestamps):
+        from .corporate_actions import CorporateActionLedger
+
+        ledger = CorporateActionLedger(
+            frame,
+            manifest,
+            config,
+            self,
+            timestamps,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            journal=self._execution_journal,
+        )
+        self._execution_journal.corporate_receivable_snapshots = {}
+        self._market_state.last_price_times = {}
+        return ledger
+
+    def _corporate_receivable_observations(self, account, metadata):
+        snapshots = self._execution_journal.corporate_receivable_snapshots
+        if snapshots is None:
+            return None
+        return [
+            snapshots[(row[0], observation[2])]
+            for row, observation in zip(
+                account, metadata or [("bar", False, None)] * len(account), strict=True
+            )
+        ]
+
     def _portfolio_snapshot(self, *, include_holdings: bool):
         return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
 
     def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
         state = self._portfolio_snapshot(include_holdings=include_holdings)
+        receivables = self._execution_journal.corporate_receivable_snapshots
+        if receivables is not None:
+            corporate = self.account.corporate
+            assert corporate is not None
+            receivables[(timestamp, None)] = corporate.receivable_value
         recorded = self._execution_journal.recorded_values
         if recorded is not None:
             rows = self._execution_journal.recorded_rows
@@ -1000,6 +1034,14 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "completed_entitlements_length": len(
+                self._execution_journal.completed_corporate_entitlements or []
+            ),
+            "corporate_receivable_snapshots": dict(
+                self._execution_journal.corporate_receivable_snapshots
+            )
+            if self._execution_journal.corporate_receivable_snapshots is not None
+            else None,
             "rebalance_counter": self._rebalance_counter,
             "original_asset_stats_keys": set(self._asset_stats),
             "asset_stats": {},
@@ -1121,6 +1163,13 @@ class Broker:
             del self._execution_journal.recorded_rows[state["recorded_length"] :]
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
+        if self._execution_journal.completed_corporate_entitlements is not None:
+            del self._execution_journal.completed_corporate_entitlements[
+                state["completed_entitlements_length"] :
+            ]
+        self._execution_journal.corporate_receivable_snapshots = state[
+            "corporate_receivable_snapshots"
+        ]
         if self._execution_journal.fill_snapshots is not None:
             del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
 
@@ -1373,6 +1422,11 @@ class Broker:
         use_open: bool = False,
     ) -> float | None:
         """Resolve a finite configured mark, returning None when unavailable."""
+        corporate = self.account.corporate
+        if corporate is not None:
+            adjusted = corporate.marks.get(asset)
+            if adjusted is not None:
+                return adjusted[0 if quantity is not None and quantity > 0 else 1]
         mark_side = None
         if self.mark_price == ExecutionPrice.QUOTE_SIDE and quantity is not None:
             mark_side = OrderSide.SELL if quantity > 0 else OrderSide.BUY
@@ -3082,6 +3136,11 @@ class Broker:
         if self.settlement_delay > 0:
             self.account.release_settled(self._bar_index)
 
+        corporate = self.account.corporate
+        if corporate is not None and corporate.marks:
+            for asset, price in prices.items():
+                if isfinite(price):
+                    corporate.marks.pop(asset, None)
         for asset, price in prices.items():
             if not isfinite(price):
                 continue

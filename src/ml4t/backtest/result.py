@@ -35,6 +35,7 @@ import polars as pl
 from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
+from ._action_artifacts import action_digest, action_frame, validate_action_tables
 from ._temporal import temporal_frame, temporal_rows, timestamp_dtype
 
 try:
@@ -55,6 +56,7 @@ if TYPE_CHECKING:
 _ARTIFACT_TYPE = "ml4t-backtest-result"
 _ARTIFACT_SCHEMA_VERSION = 3
 _BENCHMARK_ARTIFACT_SCHEMA_VERSION = 4
+_ACTION_ARTIFACT_SCHEMA_VERSION = 5
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -70,6 +72,8 @@ _COMPONENT_FILES = {
     "capital_flows": "capital_flows.parquet",
     "recorded_variables": "recorded_variables.parquet",
     "benchmark": "benchmark.parquet",
+    "corporate_actions": "corporate_actions.parquet",
+    "corporate_entitlements": "corporate_entitlements.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -260,6 +264,21 @@ class BacktestResult:
     account_method: str | None = None
     benchmark: pl.DataFrame | None = None
     benchmark_metadata: dict[str, Any] | None = None
+    corporate_actions: list[dict[str, Any]] | None = None
+    corporate_entitlements: list[dict[str, Any]] | None = None
+    corporate_receivables: list[float] | None = None
+
+    def to_actions_dataframe(self) -> pl.DataFrame:
+        """Return actual account/order action applications, including cash movements."""
+        if self.corporate_actions is None:
+            raise ValueError("Result has no captured corporate-action ledger")
+        return action_frame(self.corporate_actions)
+
+    def to_entitlements_dataframe(self) -> pl.DataFrame:
+        """Return earned obligations independently of later trading, including paid status."""
+        if self.corporate_entitlements is None:
+            raise ValueError("Result has no captured corporate entitlements")
+        return action_frame(self.corporate_entitlements, entitlements=True)
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -608,6 +627,12 @@ class BacktestResult:
             pl.Series("holdings_complete", [row[1] for row in metadata], dtype=pl.Boolean),
             pl.Series("fill_sequence", [row[2] for row in metadata], dtype=pl.UInt32),
         )
+        if self.corporate_receivables is not None:
+            if len(self.corporate_receivables) != frame.height:
+                raise ArtifactError("Corporate receivables must match actual account observations")
+            self._portfolio_state_df = self._portfolio_state_df.with_columns(
+                pl.Series("receivables_value", self.corporate_receivables, dtype=pl.Float64)
+            )
         return self._portfolio_state_df
 
     def to_holdings_dataframe(self) -> pl.DataFrame:
@@ -1053,6 +1078,10 @@ class BacktestResult:
             unavailable["predictions"] = "result has no predictions"
         if self.benchmark is None:
             unavailable["benchmark"] = "result has no prepared benchmark"
+        if self.corporate_actions is None:
+            unavailable["corporate_actions"] = "corporate-action applications were not captured"
+        if self.corporate_entitlements is None:
+            unavailable["corporate_entitlements"] = "corporate entitlements were not captured"
         if self.config is None:
             unavailable["config"] = "result has no config"
             unavailable["spec"] = "result has no config for a runtime spec"
@@ -1063,6 +1092,26 @@ class BacktestResult:
             raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
 
         selected = [name for name in requested if name not in unavailable]
+        corporate_hash = None
+        if self.corporate_actions is not None:
+            try:
+                if self.corporate_receivables is None:
+                    raise ValueError("Corporate actions require observed receivables")
+                actions_frame, entitlements_frame = (
+                    self.to_actions_dataframe(),
+                    self.to_entitlements_dataframe(),
+                )
+                validate_action_tables(
+                    actions_frame,
+                    entitlements_frame,
+                    self.to_portfolio_state_dataframe(),
+                    self.corporate_receivables,
+                )
+                corporate_hash = action_digest(
+                    actions_frame, entitlements_frame, self.corporate_receivables
+                )
+            except (TypeError, ValueError) as exc:
+                raise ArtifactWriteError(f"Invalid corporate-action ledger: {exc}") from exc
         benchmark_frame = None
         if self.benchmark is not None:
             try:
@@ -1277,11 +1326,36 @@ class BacktestResult:
             )
             written[name] = component_path
 
+        for component in ("corporate_actions", "corporate_entitlements"):
+            if component in selected:
+                target = path / _COMPONENT_FILES[component]
+                frame = (
+                    self.to_actions_dataframe()
+                    if component == "corporate_actions"
+                    else self.to_entitlements_dataframe()
+                )
+                write_component(
+                    component,
+                    lambda target=target, frame=frame: frame.write_parquet(
+                        target, compression=compression
+                    ),
+                )
+                written[component] = target
+
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
-            "schema_version": _BENCHMARK_ARTIFACT_SCHEMA_VERSION
-            if self.benchmark is not None
-            else _ARTIFACT_SCHEMA_VERSION,
+            "schema_version": _ACTION_ARTIFACT_SCHEMA_VERSION
+            if self.corporate_actions is not None
+            else (
+                _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+                if self.benchmark is not None
+                else _ARTIFACT_SCHEMA_VERSION
+            ),
+            **(
+                {"corporate_action_content_sha256": corporate_hash}
+                if corporate_hash is not None
+                else {}
+            ),
             **(
                 {
                     "benchmark_metadata": self.benchmark_metadata,
@@ -1304,6 +1378,11 @@ class BacktestResult:
                 | ({"holdings"} if self.holdings_sampling != "none" else set())
                 | ({"recorded_variables"} if self.recorded_variables is not None else set())
                 | ({"benchmark"} if self.benchmark is not None else set())
+                | (
+                    {"corporate_actions", "corporate_entitlements"}
+                    if self.corporate_actions is not None
+                    else set()
+                )
             ),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
@@ -1429,10 +1508,11 @@ class BacktestResult:
                 2,
                 _ARTIFACT_SCHEMA_VERSION,
                 _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
+                _ACTION_ARTIFACT_SCHEMA_VERSION,
             ):
                 raise UnsupportedArtifactVersionError(
                     f"Unsupported result artifact schema version {schema_version!r}; "
-                    f"supported versions are 2, {_ARTIFACT_SCHEMA_VERSION} and {_BENCHMARK_ARTIFACT_SCHEMA_VERSION}"
+                    f"supported versions are 2, {_ARTIFACT_SCHEMA_VERSION}, {_BENCHMARK_ARTIFACT_SCHEMA_VERSION} and {_ACTION_ARTIFACT_SCHEMA_VERSION}"
                 )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
@@ -1511,6 +1591,14 @@ class BacktestResult:
         required_components = _REQUIRED_RESULT_COMPONENTS | (
             {"benchmark"} if benchmark_declared else set()
         )
+        actions_declared = (
+            manifest is not None
+            and manifest.get("schema_version") == _ACTION_ARTIFACT_SCHEMA_VERSION
+        )
+        if actions_declared:
+            required_components |= {"corporate_actions", "corporate_entitlements"}
+        elif {"corporate_actions", "corporate_entitlements"} & components.keys():
+            raise ArtifactManifestError("Corporate actions require schema version 5 provenance")
         missing_required_components = sorted(required_components - components.keys())
         missing_files = sorted(
             name for name, filename in components.items() if not (path / filename).is_file()
@@ -1524,7 +1612,15 @@ class BacktestResult:
             missing_components = sorted(
                 (
                     _COMPONENT_FILES.keys()
-                    - {"funding", "holdings", "capital_flows", "recorded_variables", "benchmark"}
+                    - {
+                        "funding",
+                        "holdings",
+                        "capital_flows",
+                        "recorded_variables",
+                        "benchmark",
+                        "corporate_actions",
+                        "corporate_entitlements",
+                    }
                 )
                 - components.keys()
             )
@@ -1714,11 +1810,20 @@ class BacktestResult:
             ]
 
         observation_metadata: list[tuple[str, bool, int | None]] = []
+        corporate_receivables: list[float] = []
 
         def read_portfolio_state(
             component_path: Path,
         ) -> list[tuple[datetime, float, float, float, float, int]]:
             frame = pl.read_parquet(component_path)
+            if "receivables_value" in frame.columns:
+                if not actions_declared:
+                    raise ValueError(
+                        "Observed receivables require a declared corporate-action ledger"
+                    )
+                corporate_receivables.extend(frame["receivables_value"].to_list())
+            elif actions_declared:
+                raise ValueError("Corporate actions require actual observed receivables")
             metadata_columns = {"observation_kind", "holdings_complete", "fill_sequence"}
             if metadata_columns & set(frame.columns):
                 if not metadata_columns <= set(frame.columns):
@@ -1818,11 +1923,11 @@ class BacktestResult:
 
         def read_benchmark(component_path):
             frame = _validate_benchmark_frame(pl.read_parquet(component_path))
-            if (
-                manifest is None
-                or manifest.get("schema_version") != _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+            if manifest is None or manifest.get("schema_version") not in (
+                _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
+                _ACTION_ARTIFACT_SCHEMA_VERSION,
             ):
-                raise ValueError("Prepared benchmark requires artifact schema version 4")
+                raise ValueError("Prepared benchmark requires artifact schema version 4 or 5")
             if _benchmark_digest(frame) != manifest.get("benchmark_content_sha256"):
                 raise ValueError("Prepared benchmark content does not match its retained digest")
             probe = cls(
@@ -2030,6 +2135,15 @@ class BacktestResult:
                     )
                 )
 
+        corporate_actions = corporate_entitlements = None
+        if actions_declared:
+            actions_table = read_component("corporate_actions", pl.read_parquet, None)
+            entitlements_table = read_component("corporate_entitlements", pl.read_parquet, None)
+            if actions_table is None or entitlements_table is None:
+                raise ArtifactReadError("Declared corporate-action ledger components are missing")
+            corporate_actions = list(temporal_rows(actions_table, named=True))
+            corporate_entitlements = list(temporal_rows(entitlements_table, named=True))
+
         result = cls(
             trades=trades,
             equity_curve=equity_curve,
@@ -2051,7 +2165,30 @@ class BacktestResult:
             account_method=account_method,
             benchmark=benchmark,
             benchmark_metadata=benchmark_metadata if benchmark is not None else None,
+            corporate_actions=corporate_actions,
+            corporate_entitlements=corporate_entitlements,
+            corporate_receivables=corporate_receivables if actions_declared else None,
         )
+        if actions_declared:
+            try:
+                actions_table, entitlements_table = (
+                    result.to_actions_dataframe(),
+                    result.to_entitlements_dataframe(),
+                )
+                validate_action_tables(
+                    actions_table,
+                    entitlements_table,
+                    result.to_portfolio_state_dataframe(),
+                    corporate_receivables,
+                )
+                if manifest is None or action_digest(
+                    actions_table, entitlements_table, corporate_receivables
+                ) != manifest.get("corporate_action_content_sha256"):
+                    raise ValueError(
+                        "Corporate-action content identity does not match its manifest"
+                    )
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactReadError(f"Invalid corporate-action ledger: {exc}") from exc
         if result.holdings is not None:
             if result.holdings_sampling in {"session", "fill_and_session"} and len(
                 result.observation_metadata

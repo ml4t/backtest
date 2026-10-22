@@ -102,7 +102,30 @@ def _check_equity_terminal(
         assert result.metrics["total_external_flow"] == external, (
             "external capital does not reconcile"
         )
-    expected = initial_cash + realized_pnl + open_pnl + funding + external
+    distributions = sum(
+        row["cash_delta"]
+        for row in result.corporate_actions or ()
+        if row["operation"] == "payment"
+        and row["action_kind"] in {"cash_dividend", "cash_distribution"}
+    )
+    if result.config is not None and result.config.corporate_action_policy == "declared_terms":
+        distributions += sum(
+            row["cash_amount"]
+            for row in result.corporate_entitlements or ()
+            if not row["paid"] and row["action_kind"] in {"cash_dividend", "cash_distribution"}
+        )
+        distributions += sum(
+            row["receivable_value"]
+            - row["cash_amount"]
+            - row["security_quantity"] * (row.get("destination_basis") or 0.0)
+            - (row.get("destination_commission") or 0.0)
+            for row in result.corporate_entitlements or ()
+            if not row["paid"] and row["security_quantity"]
+        )
+    corporate_pnl = sum((row.get("realized_pnl") or 0.0) for row in result.corporate_actions or ())
+    expected = (
+        initial_cash + realized_pnl + open_pnl + funding + external + distributions + corporate_pnl
+    )
     diff = abs(expected - final_value)
 
     reported_trades = [*realized_trades, *open_trades]
@@ -320,6 +343,14 @@ def _check_commission_allocation(result: BacktestResult) -> None:
     """Verify every charged fill commission is allocated to a realized or open trade."""
     fill_commission = sum(fill.commission for fill in result.fills)
     trade_commission = sum(trade.fees for trade in result.trades)
+    trade_commission += sum(
+        (row.get("allocated_commission") or 0.0) for row in result.corporate_actions or ()
+    )
+    trade_commission += sum(
+        (row.get("destination_commission") or 0.0)
+        for row in result.corporate_entitlements or ()
+        if not row["paid"]
+    )
     tol = _accounting_tolerance(
         fill_commission,
         trade_commission,

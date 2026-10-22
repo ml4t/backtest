@@ -265,6 +265,7 @@ class SessionScheduler:
         engine = self._runtime._engine
         assert engine is not None
         registration = self._registrations[index]
+        engine._advance_account_events(timestamp)
         with engine.broker._scheduled_callback_clock(
             timestamp,
             session_date=self._event_sessions.get((timestamp, index)),

@@ -186,6 +186,14 @@ class Engine:
             getattr(feed, "capital_flows", None), list(feed.timestamps)
         )
         self.capital_changes: list[CapitalChange] = []
+        actions = getattr(feed, "corporate_actions", None)
+        self._corporate_actions = (
+            self.broker._create_corporate_action_ledger(
+                actions, feed.input_manifest, self.config, list(feed.timestamps)
+            )
+            if actions is not None
+            else None
+        )
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -475,6 +483,7 @@ class Engine:
             if self.config.cancel_policy.value == "session_end"
             else None
         )
+        corporate_actions = self._corporate_actions
         for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
@@ -510,11 +519,16 @@ class Engine:
                 if not self.runtime._accepts(timestamp):
                     continue
                 self.runtime.scheduler._before_event(timestamp, has_price_event=bool(assets_data))
+                if corporate_actions is not None:
+                    corporate_actions.advance(timestamp)
                 assets_data = self.runtime._advance(timestamp, assets_data)
                 context = self.runtime._mask_context(timestamp, context)
 
             if expire_orders is not None:
                 expire_orders(timestamp, after_event=False)
+
+            if corporate_actions is not None and self.runtime is None:
+                corporate_actions.advance(timestamp)
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
@@ -601,6 +615,8 @@ class Engine:
                 ask_sizes,
                 signals,
             )
+            if corporate_actions is not None:
+                corporate_actions.refresh()
             if session_mode:
                 session_assets.update(assets_data)
                 session_context.update(context)
@@ -749,6 +765,10 @@ class Engine:
             RuntimeError: If a run was already started on this Engine instance.
         """
         return self.run().to_dict()
+
+    def _advance_account_events(self, timestamp: datetime) -> None:
+        if self._corporate_actions is not None:
+            self._corporate_actions.advance(timestamp)
 
     def _record_portfolio_state(self, timestamp: datetime) -> None:
         """Capture per-bar NAV and explicitly sampled observed positions."""
@@ -923,6 +943,26 @@ class Engine:
 
         observed_account, observed_holdings, observation_metadata = self._result_observations()
 
+        action_records = (
+            None if self._corporate_actions is None else deepcopy(self._corporate_actions.records)
+        )
+        action_entitlements = (
+            None
+            if self._corporate_actions is None
+            else deepcopy(
+                sorted(
+                    [
+                        *self._corporate_actions.completed,
+                        *self._corporate_actions.entitlements.values(),
+                    ],
+                    key=lambda entry: (entry["entitlement_at"], entry["source"], entry["event_id"]),
+                )
+            )
+        )
+        action_receivables = self.broker._corporate_receivable_observations(
+            observed_account, observation_metadata
+        )
+
         if not self.equity_curve:
             # Return empty result for no-data case
             return BacktestResult(
@@ -950,6 +990,9 @@ class Engine:
                 recorded_variables=self.broker._recorded_variables(),
                 holdings_sampling=self.holdings_sampling,
                 capital_changes=list(self.capital_changes),
+                corporate_actions=action_records,
+                corporate_entitlements=action_entitlements,
+                corporate_receivables=action_receivables,
             )
 
         # Build EquityCurve from raw data
@@ -1068,6 +1111,9 @@ class Engine:
 
         return BacktestResult(
             trades=all_trades,  # Includes both closed and open trades
+            corporate_actions=action_records,
+            corporate_entitlements=action_entitlements,
+            corporate_receivables=action_receivables,
             equity_curve=list(self.equity_curve),
             fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),
@@ -1166,6 +1212,8 @@ def run_backtest(
     execution_limits: Any | None = None,
     funding_df: pl.DataFrame | None = None,
     capital_flows: pl.DataFrame | None = None,
+    corporate_actions: pl.DataFrame | None = None,
+    input_manifest: dict[str, Any] | None = None,
     lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
@@ -1219,6 +1267,8 @@ def run_backtest(
         feed_spec=feed_spec,
         contract=contract,
         capital_flows=capital_flows,
+        corporate_actions=corporate_actions,
+        input_manifest=input_manifest,
     )
 
     if isinstance(config, str):

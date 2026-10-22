@@ -114,6 +114,12 @@
         "name": "cancel_policy"
       },
       {
+        "annotation": "str",
+        "default": "declared_terms",
+        "keyword_only": true,
+        "name": "corporate_action_policy"
+      },
+      {
         "annotation": "ConditionalOrderMode",
         "default": {
           "enum": "ml4t.backtest.config.ConditionalOrderMode.BAR_OHLC",
@@ -542,6 +548,7 @@
       "execution": {
         "cancel_policy": "never",
         "conditional_order_mode": "bar_ohlc",
+        "corporate_action_policy": "declared_terms",
         "execution_mode": "next_bar",
         "execution_price": "open",
         "mark_price": "price",
@@ -634,6 +641,7 @@
     "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine",
     "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine, ExecutionMode, Strategy",
     "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine, OrderSide, Strategy",
+    "from ml4t.backtest import BacktestConfig, ContractSpec, Strategy, run_backtest",
     "from ml4t.backtest import BacktestConfig, DataFeed",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, OrderType, Strategy",
@@ -2003,6 +2011,8 @@
       "benchmark": "benchmark.parquet",
       "capital_flows": "capital_flows.parquet",
       "config": "config.yaml",
+      "corporate_actions": "corporate_actions.parquet",
+      "corporate_entitlements": "corporate_entitlements.parquet",
       "daily_pnl": "daily_pnl.parquet",
       "equity": "equity.parquet",
       "fills": "fills.parquet",
@@ -3607,6 +3617,10 @@
           "kind": "method",
           "signature": "(self) -> 'KeysView[str]'"
         },
+        "to_actions_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
         "to_benchmark_dataframe": {
           "kind": "method",
           "signature": "(self) -> 'pl.DataFrame'"
@@ -3626,6 +3640,10 @@
         "to_dict": {
           "kind": "method",
           "signature": "(self) -> 'dict[str, Any]'"
+        },
+        "to_entitlements_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
         },
         "to_equity_dataframe": {
           "kind": "method",
@@ -3686,7 +3704,7 @@
       },
       "module": "ml4t.backtest.result",
       "qualname": "BacktestResult",
-      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, returns_include_commissions: 'bool | None' = None, observation_metadata: 'list[tuple[str, bool, int | None]]' = <factory>, recorded_variables: 'list[tuple[datetime, int, str, str]] | None' = None, account_method: 'str | None' = None, benchmark: 'pl.DataFrame | None' = None, benchmark_metadata: 'dict[str, Any] | None' = None, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
+      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, returns_include_commissions: 'bool | None' = None, observation_metadata: 'list[tuple[str, bool, int | None]]' = <factory>, recorded_variables: 'list[tuple[datetime, int, str, str]] | None' = None, account_method: 'str | None' = None, benchmark: 'pl.DataFrame | None' = None, benchmark_metadata: 'dict[str, Any] | None' = None, corporate_actions: 'list[dict[str, Any]] | None' = None, corporate_entitlements: 'list[dict[str, Any]] | None' = None, corporate_receivables: 'list[float] | None' = None, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
     },
     "ml4t.backtest.risk.portfolio.limits:BetaLimit": {
       "kind": "class",
@@ -4413,6 +4431,10 @@
           "kind": "method",
           "signature": "(self) -> 'KeysView[str]'"
         },
+        "to_actions_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
         "to_benchmark_dataframe": {
           "kind": "method",
           "signature": "(self) -> 'pl.DataFrame'"
@@ -4432,6 +4454,10 @@
         "to_dict": {
           "kind": "method",
           "signature": "(self) -> 'dict[str, Any]'"
+        },
+        "to_entitlements_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
         },
         "to_equity_dataframe": {
           "kind": "method",
@@ -4492,7 +4518,7 @@
       },
       "module": "ml4t.backtest.result",
       "qualname": "BacktestResult",
-      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, returns_include_commissions: 'bool | None' = None, observation_metadata: 'list[tuple[str, bool, int | None]]' = <factory>, recorded_variables: 'list[tuple[datetime, int, str, str]] | None' = None, account_method: 'str | None' = None, benchmark: 'pl.DataFrame | None' = None, benchmark_metadata: 'dict[str, Any] | None' = None, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
+      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, returns_include_commissions: 'bool | None' = None, observation_metadata: 'list[tuple[str, bool, int | None]]' = <factory>, recorded_variables: 'list[tuple[datetime, int, str, str]] | None' = None, account_method: 'str | None' = None, benchmark: 'pl.DataFrame | None' = None, benchmark_metadata: 'dict[str, Any] | None' = None, corporate_actions: 'list[dict[str, Any]] | None' = None, corporate_entitlements: 'list[dict[str, Any]] | None' = None, corporate_receivables: 'list[float] | None' = None, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
     },
     "ml4t.backtest:BenchmarkData": {
       "kind": "class",
@@ -4844,7 +4870,7 @@
       },
       "module": "ml4t.backtest.datafeed",
       "qualname": "DataFeed",
-      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, feature_spec: Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, vwap_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None, session_col: str | None = None, calendar: str | None | ml4t.specs.time.CalendarUnset = <CalendarUnset.UNSET: 'unset'>, capital_flows: polars.dataframe.frame.DataFrame | None = None)"
+      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, feature_spec: Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, vwap_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None, session_col: str | None = None, calendar: str | None | ml4t.specs.time.CalendarUnset = <CalendarUnset.UNSET: 'unset'>, capital_flows: polars.dataframe.frame.DataFrame | None = None, corporate_actions: polars.dataframe.frame.DataFrame | None = None, input_manifest: dict[str, Any] | None = None)"
     },
     "ml4t.backtest:Engine": {
       "kind": "class",
@@ -4998,7 +5024,7 @@
       },
       "module": "ml4t.backtest.types",
       "qualname": "Order",
-      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _priority_notional: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None, *, commission_paid: float = 0.0, cancelled_at: datetime.datetime | None = None, cancellation_reason: str | None = None, _submitted_session_date: datetime.date | None = None, _eligible_from: datetime.datetime | None = None, _eligible_on_boundary: bool = True, _stop_triggered: bool = False, _stop_triggered_at: datetime.datetime | None = None) -> None"
+      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _priority_notional: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None, *, commission_paid: float = 0.0, action_adjusted_quantity: float | None = None, cancelled_at: datetime.datetime | None = None, cancellation_reason: str | None = None, _submitted_session_date: datetime.date | None = None, _eligible_from: datetime.datetime | None = None, _eligible_on_boundary: bool = True, _stop_triggered: bool = False, _stop_triggered_at: datetime.datetime | None = None) -> None"
     },
     "ml4t.backtest:OrderSide": {
       "kind": "class",
@@ -5425,7 +5451,7 @@
       "kind": "function",
       "module": "ml4t.backtest.engine",
       "qualname": "run_backtest",
-      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, capital_flows: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', runtime: 'RuntimeServices | None' = None, benchmark: 'BenchmarkData | None' = None) -> 'BacktestResult'"
+      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, capital_flows: 'pl.DataFrame | None' = None, corporate_actions: 'pl.DataFrame | None' = None, input_manifest: 'dict[str, Any] | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', runtime: 'RuntimeServices | None' = None, benchmark: 'BenchmarkData | None' = None) -> 'BacktestResult'"
     }
   }
 }

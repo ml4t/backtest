@@ -199,6 +199,7 @@ class Order:
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
     commission_paid: float = field(default=0.0, kw_only=True)
+    action_adjusted_quantity: float | None = field(default=None, kw_only=True)
     cancelled_at: datetime | None = field(default=None, kw_only=True)
     cancellation_reason: str | None = field(default=None, kw_only=True)
     _submitted_session_date: date | None = field(default=None, kw_only=True)
