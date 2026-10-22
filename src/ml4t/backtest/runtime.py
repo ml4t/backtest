@@ -18,6 +18,7 @@ from ._instruments import InstrumentSource, InstrumentView
 from ._temporal import temporal_frame, temporal_row, temporal_rows
 from .auxiliary import AuxiliaryData
 from .execution.callbacks import SessionScheduler
+from .futures_lifecycle import FuturesLifecyclePolicy
 
 if TYPE_CHECKING:
     from .engine import Engine
@@ -767,6 +768,7 @@ class RuntimeServices:
         instruments: InstrumentSource | None = None,
         instrument_feed_spec: FeedSpec | Any | None = None,
         inactive_position_policy: Literal["retain_last_mark", "require_flat"] = "retain_last_mark",
+        futures_lifecycle: Sequence[FuturesLifecyclePolicy] = (),
     ) -> None:
         if start is not None and not isinstance(start, datetime):
             raise TypeError("start must be a datetime")
@@ -817,6 +819,15 @@ class RuntimeServices:
         )
         self.inactive_position_policy = inactive_position_policy
         self.scheduler = SessionScheduler(self)
+        self.futures_lifecycle = tuple(futures_lifecycle)
+        if any(not isinstance(policy, FuturesLifecyclePolicy) for policy in self.futures_lifecycle):
+            raise TypeError("futures_lifecycle requires FuturesLifecyclePolicy declarations")
+        if len({policy.asset for policy in self.futures_lifecycle}) != len(self.futures_lifecycle):
+            raise ValueError("Choose one controlling lifecycle boundary per dated contract")
+        if len({policy.event_id for policy in self.futures_lifecycle}) != len(
+            self.futures_lifecycle
+        ):
+            raise ValueError("Lifecycle event IDs must be unique")
         self._engine: Engine | None = None
         self._market: MarketDataView | None = None
         self._signals: FeatureDataView | None = None
@@ -1038,8 +1049,19 @@ class RuntimeServices:
                 self._assets.active()
                 engine.broker.register_trading_control(self._assets)
             self.scheduler._bind()
+            for policy in self.futures_lifecycle:
+                policy._check_engine(engine)
+                if eligible[0] <= policy.effective_at <= eligible[-1]:
+                    if not self._accepts(policy.effective_at):
+                        raise ValueError("Lifecycle boundary falls in an excluded execution window")
+                    policy._register(self)
+            for policy in self.futures_lifecycle:
+                engine.broker.register_trading_control(policy)
             engine.broker._set_observed_high_low_reader(market._observed_high_low)
         except BaseException:
+            self.scheduler._unbind()
+            for policy in self.futures_lifecycle:
+                engine.broker.unregister_trading_control(policy)
             if self._assets is not None:
                 engine.broker.unregister_trading_control(self._assets)
                 self._assets._close()
@@ -1135,6 +1157,8 @@ class RuntimeServices:
     def _unbind(self) -> None:
         if self._engine is not None:
             self._engine.broker._set_observed_high_low_reader(None)
+            for policy in self.futures_lifecycle:
+                self._engine.broker.unregister_trading_control(policy)
         self.scheduler._unbind()
         if self._assets is not None:
             assert self._engine is not None

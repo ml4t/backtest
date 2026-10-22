@@ -328,6 +328,7 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
             "all_asset_stats",
         },
         "submit_order": {"asset"},
+        "roll_position": {"all_positions", "all_pending_orders", "all_asset_stats"},
         "update_order": {"order_id"},
         "cancel_order": {"order_id"},
         "_expire_session_orders": {"order_id"},

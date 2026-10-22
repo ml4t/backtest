@@ -30,6 +30,7 @@ from .execution.schedule import (
     is_rebalance_timestamp,
     resolve_rebalance_timestamps,
 )
+from .futures_lifecycle import FuturesLifecyclePolicy
 from .lifecycle import LifecycleDispatcher, LifecycleInvocation, callback_trace
 from .preopen import (
     AmbiguousBarPathError,
@@ -85,6 +86,7 @@ __all__ = [
     "Broker",
     "Strategy",
     "RuntimeServices",
+    "FuturesLifecyclePolicy",
     "AuxiliaryData",
     "Engine",
     "run_backtest",

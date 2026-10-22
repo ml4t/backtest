@@ -998,6 +998,7 @@ class Engine:
         futures_settlements = (
             deepcopy(self._futures_ledger.records) if self._futures_ledger is not None else None
         )
+        futures_rolls = self.broker._observed_rolls()
         account_method = (
             "per_instrument" if instrument_accounting is not None else "signed_notional"
         )
@@ -1027,6 +1028,7 @@ class Engine:
                 instrument_accounting=instrument_accounting,
                 accounting_observations=accounting_observations,
                 futures_settlements=futures_settlements,
+                futures_rolls=futures_rolls,
                 holdings=observed_holdings,
                 observation_metadata=observation_metadata,
                 recorded_variables=self.broker._recorded_variables(),
@@ -1170,6 +1172,7 @@ class Engine:
             instrument_accounting=instrument_accounting,
             accounting_observations=accounting_observations,
             futures_settlements=futures_settlements,
+            futures_rolls=futures_rolls,
             holdings=observed_holdings,
             observation_metadata=observation_metadata,
             recorded_variables=self.broker._recorded_variables(),

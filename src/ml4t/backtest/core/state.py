@@ -73,6 +73,7 @@ class ExecutionJournal:
     corporate_receivable_snapshots: dict[tuple[datetime, int | None], float] | None = None
     completed_corporate_entitlements: list[dict[str, Any]] | None = None
     futures_settlements: list[dict[str, Any]] | None = None
+    futures_roll_intents: list[dict[str, Any]] | None = None
     accounting_snapshots: dict[tuple[datetime, int | None], AccountControlContext] | None = None
     fill_snapshots: (
         list[tuple[int, datetime, tuple[float, float, float, float, int], list[tuple[Any, ...]]]]

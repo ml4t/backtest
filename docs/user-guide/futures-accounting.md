@@ -186,7 +186,9 @@ NAV, position basis, marks and fills match exactly for those declared inputs.
 The fixture also passes through ML4T Data's actual snapshot reader. These tests
 do not qualify an arbitrary contract chain, roll policy or exchange settlement feed.
 
-Keep dated selection and actual roll legs separate from this cash method. The
+Use [dated-contract rolls and lifecycle policies](dated-futures.md) to execute
+causal selections through raw contract orders. Keep those decisions separate from
+this cash method. The
 continuous-root CME performance workload lacks a dated chain/roll map and remains
 outside the Zipline comparison. No new speed claim follows from this accounting
 interface. See [migration assumptions](migrate-from-zipline.md#match-ledger-and-corporate-action-assumptions)
