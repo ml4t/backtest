@@ -48,6 +48,7 @@ from .execution.fill_executor import FillExecutor
 from .funding import FundingEvent, FundingPayment
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
+    AssetClass,
     AssetTradingStats,
     ContractSpec,
     ExecutionMode,
@@ -1088,6 +1089,9 @@ class Broker:
             if self.account.futures_methods is not None
             else None,
             "futures_settlements_length": len(self._execution_journal.futures_settlements or []),
+            "futures_roll_intents_length": len(self._execution_journal.futures_roll_intents or []),
+            "futures_roll_intents_enabled": self._execution_journal.futures_roll_intents
+            is not None,
             "accounting_snapshots": dict(self._execution_journal.accounting_snapshots)
             if self._execution_journal.accounting_snapshots is not None
             else None,
@@ -1232,6 +1236,10 @@ class Broker:
         if self._execution_journal.futures_settlements is not None:
             del self._execution_journal.futures_settlements[state["futures_settlements_length"] :]
         self._execution_journal.accounting_snapshots = state["accounting_snapshots"]
+        if not state["futures_roll_intents_enabled"]:
+            self._execution_journal.futures_roll_intents = None
+        elif self._execution_journal.futures_roll_intents is not None:
+            del self._execution_journal.futures_roll_intents[state["futures_roll_intents_length"] :]
         if state["futures_submission_state"] is not None:
             self._order_book.restore_submission_state(state["futures_submission_state"])
 
@@ -2267,6 +2275,135 @@ class Broker:
             trail_amount=trail_amount,
             options=_options,
         )
+
+    def roll_position(
+        self,
+        old_asset: str,
+        new_asset: str,
+        *,
+        roll_id: str,
+        decision_at: datetime | None = None,
+        available_at: datetime | None = None,
+        new_quantity: float | None = None,
+        selection: Mapping[str, Any] | None = None,
+    ) -> tuple[Order | None, Order | None]:
+        """Submit paired non-atomic market legs, retaining actual outcomes under one ID.
+
+        The current execution mode and ordinary order controls remain effective. A
+        filled close does not guarantee a filled open. Repeating an unchanged roll
+        ID returns its existing orders. Declared selection clocks must be causal;
+        raw execution quotes still come exclusively from the feed.
+        """
+        from .corporate_actions import action_terms_json
+
+        now = self._market_state.time
+        if now is None:
+            raise ValueError("A futures roll requires an active market clock")
+        if not isinstance(roll_id, str) or not roll_id.strip():
+            raise ValueError("A futures roll requires a nonempty roll_id")
+        if old_asset == new_asset:
+            raise ValueError("Roll legs require distinct contracts")
+        specs = [self.get_contract_spec(asset) for asset in (old_asset, new_asset)]
+        if any(spec is None or spec.asset_class is not AssetClass.FUTURE for spec in specs):
+            raise ValueError("Both roll legs require declared FUTURE ContractSpecs")
+        old_spec, new_spec = specs
+        assert old_spec is not None and new_spec is not None
+        if old_spec.currency != new_spec.currency:
+            raise ValueError("Roll contract currencies must agree; FX is not implicit")
+        point = decision_at if decision_at is not None else now
+        for value in (point, available_at):
+            if value is not None and (
+                not isinstance(value, datetime) or (value.tzinfo is None) != (now.tzinfo is None)
+            ):
+                raise ValueError("Roll clocks require feed-compatible physical instants")
+        if point > now or available_at is not None and available_at > point:
+            raise ValueError("A roll cannot precede its selection decision or availability")
+        selection_json = action_terms_json(dict(selection)) if selection is not None else None
+        existing = self._execution_journal.futures_roll_intents
+        for intent in existing or ():
+            if intent["roll_id"] != roll_id:
+                continue
+            if (
+                intent["close_asset"] != old_asset
+                or intent["open_asset"] != new_asset
+                or decision_at is not None
+                and intent["decision_at"] != point.isoformat()
+                or available_at is not None
+                and intent["available_at"] != available_at.isoformat()
+                or new_quantity is not None
+                and intent["open_quantity"] != new_quantity
+                or selection_json is not None
+                and intent["selection_json"] != selection_json
+            ):
+                raise ValueError("Conflicting roll_id cannot replace an existing intent")
+            return (
+                self.get_order(intent["close_order_id"])
+                if intent["close_order_id"] is not None
+                else None,
+                self.get_order(intent["open_order_id"])
+                if intent["open_order_id"] is not None
+                else None,
+            )
+        if any(
+            order.asset in (old_asset, new_asset) for order in self.get_orders(pending_only=True)
+        ):
+            raise ValueError("Resolve pending orders for both contracts before submitting a roll")
+        position = self.get_position(old_asset)
+        quantity = position.quantity if position is not None else 0.0
+        replacement = quantity if new_quantity is None else new_quantity
+        if (
+            isinstance(replacement, bool)
+            or not isinstance(replacement, (int, float))
+            or not isfinite(replacement)
+            or quantity
+            and replacement * quantity <= 0
+        ):
+            raise ValueError("Replacement quantity must be finite and preserve the roll direction")
+        if quantity and new_quantity is None and old_spec.multiplier != new_spec.multiplier:
+            raise ValueError("Declare new_quantity when roll contract multipliers differ")
+        self._capture_lifecycle_mutation(
+            all_positions=True, all_pending_orders=True, all_asset_stats=True
+        )
+        state = self._snapshot_lifecycle_state(
+            all_positions=True, all_pending_orders=True, all_asset_stats=True
+        )
+        try:
+            options = SubmitOrderOptions(rebalance_id=f"FUTURES-ROLL:{roll_id}")
+            close = self.submit_order(old_asset, -quantity, _options=options) if quantity else None
+            opened = (
+                self.submit_order(new_asset, replacement, _options=options)
+                if quantity and close is not None and close.status is not OrderStatus.REJECTED
+                else None
+            )
+            if self._execution_journal.futures_roll_intents is None:
+                self._execution_journal.futures_roll_intents = []
+            self._execution_journal.futures_roll_intents.append(
+                {
+                    "roll_id": roll_id,
+                    "close_asset": old_asset,
+                    "open_asset": new_asset,
+                    "close_quantity": -quantity,
+                    "open_quantity": replacement if quantity else 0.0,
+                    "close_order_id": close.order_id if close is not None else None,
+                    "open_order_id": opened.order_id if opened is not None else None,
+                    "decision_at": point.isoformat(),
+                    "available_at": available_at.isoformat() if available_at is not None else None,
+                    "submitted_at": now.isoformat(),
+                    "selection_json": selection_json,
+                }
+            )
+            return close, opened
+        except Exception:
+            self._restore_lifecycle_state(state)
+            raise
+
+    def _observed_rolls(self):
+        intents = self._execution_journal.futures_roll_intents
+        if intents is None:
+            return None
+        from ._rolls import project_rolls
+
+        return project_rolls(intents, self._order_state.orders, self._execution_journal.fills)
 
     def submit_bracket(
         self,

@@ -1,0 +1,207 @@
+"""Public Engine roll execution acceptance; prices are raw individual contracts."""
+
+from datetime import UTC, datetime, timedelta
+
+import polars as pl
+import pytest
+
+from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
+from ml4t.backtest.config import CommissionType, ExecutionMode
+from ml4t.backtest.controls import OrderConstraints, TradingControlViolation
+
+TIMES = [datetime(2025, 3, 3, 21, tzinfo=UTC) + timedelta(days=i) for i in range(6)]
+
+
+@pytest.mark.parametrize("direction", [1, -1])
+@pytest.mark.parametrize("scenario", ["complete", "missing_new_quote", "rejected_open"])
+def test_dated_roll_links_actual_legs_and_fees_without_using_adjustment_marks(direction, scenario):
+    orders = []
+
+    class Roll(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("capture:ESH25", direction)
+            if timestamp in TIMES[2:4]:
+                legs = broker.roll_position(
+                    "capture:ESH25",
+                    "capture:ESM25",
+                    roll_id="selection-1",
+                    decision_at=TIMES[2],
+                    available_at=TIMES[1],
+                )
+                if timestamp == TIMES[2]:
+                    orders.extend(legs)
+                else:
+                    assert [order.order_id for order in legs] == [
+                        order.order_id for order in orders
+                    ]
+
+    prices = pl.DataFrame(
+        {
+            "timestamp": [t for t in TIMES for _ in range(2)],
+            "asset": ["capture:ESH25", "capture:ESM25"] * 6,
+            "close": [
+                4000.0,
+                4010.0,
+                4000.0,
+                4010.0,
+                4010.0,
+                4020.0,
+                4020.0,
+                4030.0,
+                4030.0,
+                4040.0,
+                4040.0,
+                4050.0,
+            ],
+        }
+    )
+    if scenario == "missing_new_quote":
+        prices = prices.filter(
+            (pl.col("asset") != "capture:ESM25") | (pl.col("timestamp") < TIMES[3])
+        )
+    result = Engine(
+        DataFeed(prices_df=prices, input_manifest={"price_basis": "raw"}),
+        Roll(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_leverage=True,
+            allow_short_selling=True,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            asset: ContractSpec(
+                asset,
+                asset_class=AssetClass.FUTURE,
+                multiplier=50,
+                margin=200000
+                if scenario == "rejected_open" and asset == "capture:ESM25"
+                else 15000,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+            for asset in ["capture:ESH25", "capture:ESM25"]
+        },
+        holdings_sampling="bar",
+    ).run()
+    expected = [
+        (TIMES[1], "capture:ESH25", "buy" if direction > 0 else "sell", 1, 4000),
+        (TIMES[3], "capture:ESH25", "sell" if direction > 0 else "buy", 1, 4020),
+        (TIMES[3], "capture:ESM25", "buy" if direction > 0 else "sell", 1, 4030),
+    ]
+    if scenario != "complete":
+        expected = expected[:2]
+    assert [
+        (f.timestamp, f.asset, f.side.value, f.quantity, f.price) for f in result.fills
+    ] == expected
+    assert len(orders) == 2
+    closing = (
+        100000
+        + direction * (2000 if scenario == "complete" else 1000)
+        - (6 if scenario == "complete" else 4)
+    )
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == closing
+    assert result.to_equity_dataframe()["equity"][-1] == closing
+    rolls = result.to_rolls_dataframe()
+    assert rolls["roll_id"].to_list() == ["selection-1", "selection-1"]
+    assert rolls["leg"].to_list() == ["close", "open"]
+    assert rolls["status"].to_list() == [
+        "filled",
+        {
+            "complete": "filled",
+            "missing_new_quote": "pending",
+            "rejected_open": "rejected",
+        }[scenario],
+    ]
+    assert (
+        rolls["roll_state"].to_list() == ["completed" if scenario == "complete" else "partial"] * 2
+    )
+    assert rolls["commission"].to_list() == [2, 2 if scenario == "complete" else 0]
+    assert rolls["filled_at"].to_list() == [TIMES[3], TIMES[3] if scenario == "complete" else None]
+
+
+@pytest.mark.parametrize("immediate", [False, True])
+@pytest.mark.parametrize("failure", ["blocked_open", "future_availability", "invalid_quantity"])
+def test_failed_roll_can_be_caught_without_leaving_orders_fees_or_phantom_margin(
+    failure, immediate
+):
+    class Roll(Strategy):
+        def on_start(self, broker):
+            broker.register_trading_control(OrderConstraints(blocked_assets=frozenset({"NEW"})))
+
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("OLD", 1)
+            if timestamp == TIMES[2]:
+                kwargs = (
+                    {"available_at": TIMES[3]}
+                    if failure == "future_availability"
+                    else {"new_quantity": float("nan")}
+                    if failure == "invalid_quantity"
+                    else {}
+                )
+                error = TradingControlViolation if failure == "blocked_open" else ValueError
+                with pytest.raises(error):
+                    broker.roll_position("OLD", "NEW", roll_id="failed", **kwargs)
+                assert broker.get_position("OLD").quantity == 1
+                assert not broker.get_orders(pending_only=True)
+                broker.submit_order("OLD", -1)
+                broker.submit_order("THIRD", 1)
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in TIMES for _ in range(3)],
+                    "asset": ["OLD", "NEW", "THIRD"] * 6,
+                    "close": [
+                        value
+                        for i in range(6)
+                        for value in [
+                            [4000.0, 4000.0, 4010.0, 4020.0, 4030.0, 4040.0][i],
+                            100.0,
+                            100.0,
+                        ]
+                    ],
+                }
+            )
+        ),
+        Roll(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_leverage=True,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+            execution_mode=ExecutionMode.SAME_BAR if immediate else ExecutionMode.NEXT_BAR,
+            immediate_fill=immediate,
+            buying_power_reservation=True,
+        ),
+        contract_specs={
+            asset: ContractSpec(
+                asset,
+                asset_class=AssetClass.FUTURE,
+                multiplier=multiplier,
+                margin=margin,
+                accounting_method="futures_variation",
+                settlement_policy="on_mark",
+            )
+            for asset, multiplier, margin in [
+                ("OLD", 50, 15000),
+                ("NEW", 50, 15000),
+                ("THIRD", 20, 100000),
+            ]
+        },
+    ).run()
+    assert [fill.asset for fill in result.fills] == ["OLD", "OLD", "THIRD"]
+    assert (
+        result.to_portfolio_state_dataframe()["cash"][-1]
+        == 100000 + (500 if immediate else 1000) - 6
+    )
+    assert sum(fill.commission for fill in result.fills) == 6
+    with pytest.raises(ValueError, match="no captured"):
+        result.to_rolls_dataframe()

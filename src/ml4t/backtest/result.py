@@ -280,6 +280,15 @@ class BacktestResult:
     instrument_accounting: dict[str, dict[str, Any]] | None = None
     accounting_observations: list[AccountControlContext] | None = None
     futures_settlements: list[dict[str, Any]] | None = None
+    futures_rolls: list[dict[str, Any]] | None = None
+
+    def to_rolls_dataframe(self) -> pl.DataFrame:
+        """Return actual close/open order outcomes; paired execution is not atomic."""
+        if self.futures_rolls is None:
+            raise ValueError("Result has no captured futures roll intents")
+        from ._rolls import roll_frame
+
+        return roll_frame(self.futures_rolls)
 
     def to_futures_settlements_dataframe(self) -> pl.DataFrame:
         """Return actual mark, scheduled and closing variation transfers, excluding fees."""
