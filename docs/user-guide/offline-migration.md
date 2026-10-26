@@ -13,8 +13,8 @@ installation routes separate.
 
 ## Versioned package installation
 
-The release-closeout cohort is Backtest 0.2.0, Data 0.3.1, Engineer 0.2.1,
-Diagnostic 0.2.0 and Specs 0.2.0 on Python 3.12-3.14. Run this route only after
+Use Backtest 0.2.0, Data 0.3.1, Engineer 0.2.1, Diagnostic 0.2.0 and Specs 0.2.0
+on Python 3.12-3.14. Run this route only after
 all five versions are available on PyPI. Until then, use the qualified source
 cohort below rather than mixing a newer script with an older installed API.
 
@@ -31,8 +31,8 @@ uv run --no-project --python 3.12 \
 
 Append `--lazy` and choose a different output directory for the lazy-input
 variant. The expected output and numerical checks below apply to both routes.
-Final publication verification must run this exact installed-package cohort;
-a successful source-cohort run alone does not establish that result.
+Keep these package versions together; the preserved source builds below have
+different version labels and do not establish compatibility with older PyPI wheels.
 
 ## Preserved qualified source cohort
 
