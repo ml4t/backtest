@@ -2,19 +2,43 @@
 
 Prepare data and features before simulation, execute through the existing
 `Strategy` and `Engine`, then send the saved result to Diagnostic. The runnable
-[`offline_migration.py`](https://github.com/ml4t/backtest/blob/e811285c99d230602bb8e5bac39c86f0979b0254/examples/offline_migration.py)
+[`offline_migration.py`](https://github.com/ml4t/backtest/blob/45becfb0985eb59e63c7e3d3f513dba372b103da/examples/offline_migration.py)
 example demonstrates this route with synthetic equities. It needs no Zipline,
 Pyfolio, data-provider credentials or network connection during execution.
 
-This guide describes unreleased successor source. The preserved Backtest 0.1.13
-publication candidate does not contain these interfaces. Package version labels
-alone do not identify every source build below.
+Backtest 0.2.0 contains these interfaces. The complete analysis route also
+requires Diagnostic 0.2.0; the published Diagnostic 0.1.9 wheel does not contain
+its newer holdings and legacy-result helpers. Keep the package and source
+installation routes separate.
 
-## Qualified inputs and packages
+## Versioned package installation
+
+Use Backtest 0.2.0, Data 0.3.1, Engineer 0.2.1, Diagnostic 0.2.0 and Specs 0.2.0
+on Python 3.12-3.14. Run this route only after
+all five versions are available on PyPI. Until then, use the qualified source
+cohort below rather than mixing a newer script with an older installed API.
+
+From a checkout containing the linked example, install the exact cohort and
+run the eager workflow:
+
+```bash
+uv run --no-project --python 3.12 \
+  --with 'ml4t-backtest==0.2.0' --with 'ml4t-data==0.3.1' \
+  --with 'ml4t-engineer[calendars]==0.2.1' --with 'ml4t-diagnostic==0.2.0' \
+  --with 'ml4t-specs==0.2.0' --with 'pandas>=3.1' --with 'pyarrow>=26' \
+  python -I examples/offline_migration.py ./offline-run
+```
+
+Append `--lazy` and choose a different output directory for the lazy-input
+variant. The expected output and numerical checks below apply to both routes.
+Keep these package versions together; the preserved source builds below have
+different version labels and do not establish compatibility with older PyPI wheels.
+
+## Preserved qualified source cohort
 
 | Component | Tested identity |
 |---|---|
-| Backtest | Build the source revision containing this guide; final wheel and source identities are retained by CI. |
+| Backtest | Original source-cohort example [e811285c](https://github.com/ml4t/backtest/tree/e811285c99d230602bb8e5bac39c86f0979b0254); the current released package is 0.2.0. |
 | Data | `0.2.2.dev21+gc3b9db80a`, [source c3b9db80](https://github.com/ml4t/data/tree/c3b9db80a66397420fb27adeccc762559dd41e07). |
 | Engineer | `0.1.7.dev58+g093b72d68`, [source 093b72d6](https://github.com/ml4t/engineer/tree/093b72d6801cf2b279f1aa682c6d2cabe45d494d). |
 | Diagnostic | Distribution label `0.1.9`, [source 519aab16](https://github.com/ml4t/diagnostic/tree/519aab16eb11567c33072b4befa76aef4ecc627a). This identifies the tested source build; it does not claim the published 0.1.9 wheel contains its newer holdings and legacy-result helpers. |

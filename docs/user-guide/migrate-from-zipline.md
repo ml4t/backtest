@@ -116,13 +116,13 @@ when migrating a real strategy; a matching final value alone can hide different
 orders or interim exposure.
 
 If you need portfolio analysis after migration, evaluate the optional
-[diagnostic handoff](../tutorials/diagnostic-handoff.md). Its separate checked
-example passes a `BacktestResult` to `ml4t-diagnostic==0.1.4` and computes
-return and drawdown statistics.
+[diagnostic handoff](../tutorials/diagnostic-handoff.md). Its checked examples
+cover return statistics and observed holdings. The complete Data-to-Diagnostic route is documented in the
+[versioned offline workflow](offline-migration.md).
 
 ## Preserve Zipline read shapes
 
-The upcoming Backtest release includes `compat.zipline.assets.Asset` and
+Backtest 0.2.0 includes `compat.zipline.assets.Asset` and
 `compat.zipline.data.BarData` for Pandas read containers inside a native
 `Strategy`. Supply the stable account key and any actual legacy SID explicitly;
 these containers do not resolve symbols or ingest a bundle. Native dated-symbol
@@ -267,9 +267,8 @@ see [Profiles](profiles.md); its supported workload and cost boundaries apply.
 
 ## Run original callback signatures
 
-In a development build containing the callback adapter, import `run_algorithm`
-and API names from `ml4t.backtest.compat.zipline`. This API is not part of the
-pending 0.1.13 release candidate. Pass prepared prices and an explicit mapping
+In Backtest 0.2.0, import `run_algorithm` and API names from
+`ml4t.backtest.compat.zipline`. Pass prepared prices and an explicit mapping
 from native account keys to display symbols and optional original SIDs. The
 adapter executes callbacks through the native Engine; it does not discover a
 Zipline bundle or rewrite imports in user source.
