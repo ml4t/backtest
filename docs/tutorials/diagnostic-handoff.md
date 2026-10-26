@@ -1,7 +1,7 @@
 # Send a backtest to ml4t-diagnostic
 
 `ml4t-diagnostic` is an optional dependency for post-backtest analysis. This
-example was verified with `ml4t-diagnostic==0.1.4` in addition to the installed
+minimal example was originally verified with `ml4t-diagnostic==0.1.4` and an installed
 `ml4t-backtest` wheel. Install that version in an analysis environment before
 running the code. The core [result export tutorial](results-and-analysis.md)
 runs without it.
@@ -54,7 +54,7 @@ Chapter 17, Section 17.3, [Portfolio metrics](https://github.com/stefan-jansen/m
 
 ## Send observed intraday accounts and holdings
 
-The upcoming Backtest successor release can capture actual holdings with
+Backtest 0.2.0 can capture actual holdings with
 `holdings_sampling="bar"`. The example below uses the public `PortfolioAnalysis`
 constructor from Diagnostic 0.1.9. It preserves the three minute instants and
 uses an explicitly chosen annualization scale. Returns include the first fill's
@@ -122,8 +122,8 @@ account observations and an empty holdings table; it needs no invented asset.
 Keep `observation_id` when storing fill-level snapshots: several economically
 distinct observations can share one timestamp.
 
-Diagnostic's planned holdings-analysis API has also been exercised with these
-producer tables, using its pinned source candidate. That API is not part of the
-published Diagnostic 0.1.9 package. Use the public constructor above for published
-return analysis; Backtest continues to supply accounts, holdings and fills rather
-than implementing a second analytics library.
+Diagnostic 0.2.0 adds the complete holdings and activity handoff. Use the
+[versioned offline workflow](../user-guide/offline-migration.md) after its package
+cohort is published, or the explicitly pinned source route while publication is
+pending. Those newer helpers are absent from the published Diagnostic 0.1.9 wheel.
+Backtest supplies accounts, holdings and fills; Diagnostic owns their analysis.
