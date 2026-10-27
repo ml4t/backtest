@@ -229,7 +229,7 @@ pip install ml4t-backtest
 - **New here?** Start with the [Quickstart](getting-started/quickstart.md)
 - **Coming from the book?** Use the [Book Guide](book-guide/index.md)
 - **Debugging execution behavior?** Read [Execution Semantics](user-guide/execution-semantics.md)
-- **Need exact interfaces?** See the [API Reference](api/index.md)
+- **Looking up functions and parameters?** See the [API Reference](api/index.md)
 
 ## From Book to Library
 
@@ -238,7 +238,7 @@ If you are reading *Machine Learning for Trading, Third Edition*, use the docs i
 1. learn the execution or reporting concept in the notebook
 2. use the [Book Guide](book-guide/index.md) to find the matching production workflow
 3. move to the relevant user-guide page for the reusable API
-4. finish in the [API Reference](api/index.md) for exact call signatures
+4. look up functions and parameters in the [API Reference](api/index.md)
 
 This is especially important for quote-aware execution, realistic reporting, rebalancing,
 and strategy portability into `ml4t-live`.

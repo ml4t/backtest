@@ -4,8 +4,7 @@ This map connects selected *Machine Learning for Trading, Third Edition*
 companion notebooks to the library workflows that implement the corresponding
 backtest operations. For the library task guide, start at the
 [User Guide](../user-guide/index.md). The [tutorials](../getting-started/quickstart.md) work with
-bundled synthetic data, so the book and its datasets are optional. All book
-links below point to one checked companion revision.
+bundled synthetic data, so the book and its datasets are optional.
 
 Each notebook description distinguishes direct library examples from
 research that supplies inputs or interprets outputs. A case study that uses a
