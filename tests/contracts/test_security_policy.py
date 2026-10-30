@@ -186,6 +186,12 @@ def test_ci_and_release_both_require_the_evidence_retaining_security_workflow() 
         "dependency-audit.json",
         "source-security.json",
         "security-summary.json",
+        "security-contributor-requirements.txt",
+        "security-zipline-requirements.txt",
+        "dependency-audit-contributor.json",
+        "dependency-audit-zipline.json",
+        "security-summary-contributor.json",
+        "security-summary-zipline.json",
         ".github/security-policy.toml",
         ".github/security-exceptions.toml",
     }
