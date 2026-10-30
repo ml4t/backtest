@@ -33,6 +33,14 @@ jobs:
           --format requirements-txt --quiet
           --output-file security-requirements.txt
 
+      - name: Export the locked contributor and Zipline dependency sets
+        run: |
+          uv export --locked --all-extras --all-groups --no-emit-project --no-sources \
+            --format requirements-txt --quiet --output-file security-contributor-requirements.txt
+          UV_NO_SOURCES=0 uv export --locked --directory validation/environments/zipline \
+            --no-emit-project --no-emit-package ml4t-backtest \
+            --format requirements-txt --quiet --output-file "$GITHUB_WORKSPACE/security-zipline-requirements.txt"
+
       - name: Scan dependencies and source
         run: |
           set +e
@@ -48,6 +56,18 @@ jobs:
           test "$dependency_status" -le 1
           test "$source_status" -le 1
 
+      - name: Scan contributor and Zipline dependencies
+        run: |
+          for profile in contributor zipline; do
+            set +e
+            uvx --python "${{ env.PYTHON_VERSION }}" --from "pip-audit==$PIP_AUDIT_VERSION" pip-audit \
+              --requirement "security-${profile}-requirements.txt" --require-hashes --strict \
+              --format json --output "dependency-audit-${profile}.json"
+            dependency_status=$?
+            set -e
+            test "$dependency_status" -le 1
+          done
+
       - name: Enforce the security policy
         run: >-
           uv run --no-project --python "${{ env.PYTHON_VERSION }}"
@@ -56,6 +76,16 @@ jobs:
           --dependency-report dependency-audit.json
           --source-report source-security.json
           --summary security-summary.json
+
+      - name: Enforce contributor and Zipline security policy
+        run: |
+          for profile in contributor zipline; do
+            uv run --no-project --python "${{ env.PYTHON_VERSION }}" \
+              python validation/check_security.py \
+              --requirements "security-${profile}-requirements.txt" \
+              --dependency-report "dependency-audit-${profile}.json" \
+              --source-report source-security.json --summary "security-summary-${profile}.json"
+          done
 
       - name: Retain security inputs and outputs
         if: always()
@@ -67,6 +97,12 @@ jobs:
             dependency-audit.json
             source-security.json
             security-summary.json
+            security-contributor-requirements.txt
+            security-zipline-requirements.txt
+            dependency-audit-contributor.json
+            dependency-audit-zipline.json
+            security-summary-contributor.json
+            security-summary-zipline.json
             .github/security-policy.toml
             .github/security-exceptions.toml
           if-no-files-found: error
