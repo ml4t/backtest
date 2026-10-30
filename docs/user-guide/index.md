@@ -35,7 +35,7 @@ The examples use declared settings rather than implied market defaults. Start wi
 
 ## From a book notebook to a library run
 
-The [Book Guide](../book-guide/index.md) maps checked companion notebooks to the matching library workflows. Begin with the library quickstart, then compare the notebook's data, decision time, fill time, account rules, and costs with the settings in your run. Keep the original notebook's research question separate from the engine configuration. The book links point to a pinned companion revision, and each linked tutorial states what its notebook adds.
+The [Book Guide](../book-guide/index.md) connects companion notebooks to library workflows. Begin with the library quickstart, then compare the notebook's data, decision time, fill time, account rules, and costs with the settings in your run. Each linked tutorial explains what you can learn from the corresponding notebook.
 
 ## Check a result
 
