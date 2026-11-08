@@ -3,20 +3,72 @@
 import warnings
 from datetime import UTC, datetime, timedelta
 
+import polars as pl
 import pytest
 
 from ml4t.backtest import (
+    BacktestConfig,
     Broker,
+    DataFeed,
+    Engine,
     OrderSide,
+    OrderType,
+    Strategy,
 )
 from ml4t.backtest.config import (
+    ExecutionMode,
     ExecutionPrice,
     RebalanceMode,
     ShareRounding,
+    ShareType,
 )
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.execution.schedule import RebalanceSchedule, resolve_rebalance_timestamps
 from ml4t.backtest.models import NoCommission, NoSlippage
+
+
+@pytest.mark.parametrize("pending_exit", [False, True])
+def test_zero_weight_closes_fractional_cash_position_once(pending_exit):
+    times = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in (6, 7, 8)]
+    prices = pl.DataFrame(
+        {"timestamp": times, "asset": ["TEST"] * 3, "close": [37.47, 41.87, 41.87]}
+    )
+
+    class ExitAtZeroWeight(Strategy):
+        def __init__(self):
+            self.executor = TargetWeightExecutor(
+                RebalanceConfig(cancel_before_rebalance=not pending_exit)
+            )
+
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("TEST", 0.1)
+            elif timestamp == times[1]:
+                if pending_exit:
+                    broker.submit_order("TEST", -0.1, order_type=OrderType.LIMIT, limit_price=41.87)
+                self.preview_shares = self.executor.preview({"TEST": 0.0}, data, broker)[0][
+                    "quantized_shares"
+                ]
+                self.executor.execute({"TEST": 0.0}, data, broker)
+            else:
+                self.final_position = broker.get_position("TEST")
+
+    strategy = ExitAtZeroWeight()
+    result = Engine(
+        DataFeed(prices_df=prices),
+        strategy,
+        BacktestConfig(
+            calendar=None,
+            initial_cash=10_000,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            share_type=ShareType.FRACTIONAL,
+        ),
+    ).run()
+
+    assert result.to_rejected_orders_dataframe().is_empty()
+    assert result.to_fills_dataframe()["quantity"].to_list() == [0.1, 0.1]
+    assert strategy.final_position is None
+    assert strategy.preview_shares == (0.0 if pending_exit else -0.1)
 
 
 class TestRebalanceConfig:
