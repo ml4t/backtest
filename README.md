@@ -431,6 +431,9 @@ excluded. The table above publishes the measured ratios with their date, version
 and uncertainty. They describe those executions and do not establish a hardware-independent speed
 ranking.
 
+For the optional NautilusTrader equity and pysystemtrade futures workloads, see the
+[reference comparison commands](validation/README.md#nautilustrader-and-pysystemtrade).
+
 ## Documentation
 
 - [Getting Started](docs/getting-started/quickstart.md) - your first backtest

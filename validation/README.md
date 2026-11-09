@@ -193,6 +193,56 @@ samples, deterministic 95% bootstrap intervals, exact output checksums, immutabl
 identities, and semantic disclosures for an idiomatic view. This controlled synthetic artifact is
 not used for the published real-strategy ratios above.
 
+### NautilusTrader and pysystemtrade
+
+These optional comparisons use synthetic prices and predetermined target quantities. Each side
+must independently match a cent-denominated reference ledger before the runner reports timings.
+
+| Workload | Native reference | What must match |
+|---|---|---|
+| 50 equities × 252 daily bars | [NautilusTrader 2.0.0rc8](https://pypi.org/project/nautilus-trader/2.0.0rc8/) cash-account market orders | Fill time, instrument, signed size, price and fee; final cash and positions |
+| 20 equities × 1,950 one-minute bars | NautilusTrader 2.0.0rc8 with the same order rules | The same fill and account fields |
+| 12 futures × 504 daily marks | [pysystemtrade 1.8.3 source](https://github.com/pst-group/pysystemtrade/tree/bbf5cf823e16be1cca27493a94099eb8cf33f6e7) position-to-fill and cash-cost accounting | Inferred fills, costs and final positions; each daily equity mark against Backtest's variation-cash ledger |
+
+The equity workload sends long-only market orders at each instrument's close, with targets
+known before that close, zero costs, and enough cash to avoid order priority effects. It does
+not measure tick or order book replay. The futures workload applies a $50 point value and a
+$2 per-contract fee. It compares the accounting step after targets are known, without
+forecast generation, contract selection, rolls or broker simulation on the pysystemtrade side.
+Its calculation time is not an engine speed comparison.
+
+From the repository root, create the two Python 3.13 environments and fetch the pinned
+pysystemtrade source. The runner imports its accounting modules from that checkout. This avoids
+installing the separate broker and PDF-reporting dependencies of the full application.
+
+```bash
+uv venv --python 3.13 .venv-nautilus-v2
+uv pip sync --python .venv-nautilus-v2/bin/python validation/environments/nautilus/requirements.txt
+uv venv --python 3.13 .venv-pysystemtrade-accounting
+uv pip sync --python .venv-pysystemtrade-accounting/bin/python validation/environments/pysystemtrade/requirements.txt
+
+git init validation/candidates/pysystemtrade
+git -C validation/candidates/pysystemtrade fetch --depth 1 \
+  https://github.com/pst-group/pysystemtrade.git bbf5cf823e16be1cca27493a94099eb8cf33f6e7
+git -C validation/candidates/pysystemtrade checkout --detach FETCH_HEAD
+
+.venv-nautilus-v2/bin/python validation/reference_workloads.py nautilus-daily
+.venv-nautilus-v2/bin/python validation/reference_workloads.py nautilus-minute
+.venv-pysystemtrade-accounting/bin/python validation/reference_workloads.py pysystemtrade-futures \
+  --pysystemtrade-source validation/candidates/pysystemtrade
+```
+
+Add `--measure --output result.json` to retain the verified ledgers and ten isolated timing
+samples per side. The runner performs one unmeasured pass per side, alternates execution order,
+and reports both the native call interval and complete process time. These workloads are
+separate from the retained release comparison above.
+
+Use this runner for NautilusTrader 2.x. The historical `benchmark_suite.py --framework nautilus`
+route uses the 1.x API. Its synthetic generator can put the open outside the high/low range;
+NautilusTrader 1.221.0 correctly rejects those bars. The adapter also failed when sorting
+multiple instrument bars with equal timestamps in that version. Neither result establishes a
+limitation of daily or minute bars in NautilusTrader.
+
 ## Virtual Environment Setup
 
 ```bash
@@ -240,9 +290,9 @@ validation/
 ├── REAL_STRATEGY_PERFORMANCE.json    # Retained engine timing evidence
 ├── large_scale_evidence.py    # Reconstructable exact scale matrix
 ├── cross_framework_performance.py  # Repeated controlled and idiomatic evidence
+├── reference_workloads.py     # Optional NautilusTrader and pysystemtrade comparisons
 ├── run_all_benchmarks.py      # Compatibility route to the retained performance runner
 ├── benchmark_suite.py         # Shared framework workload adapters
 ├── lean/                      # LEAN integration
-├── trade_logs/                # Golden file CSVs (gitignored)
-└── nautilus/                  # Nautilus Trader evaluation
+└── trade_logs/                # Golden file CSVs (gitignored)
 ```
