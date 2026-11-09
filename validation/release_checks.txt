@@ -43,4 +43,5 @@ validation/scenarios/definitions.py
 validation/reference_workloads.py
 validation/real_reference_workloads.py
 validation/nautilus_funding.py
+validation/nautilus_dated_futures.py
 validation/pysystemtrade_trend.py

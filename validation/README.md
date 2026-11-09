@@ -257,6 +257,8 @@ from the retained book strategies; they do not change the existing performance t
 .venv-nautilus-v2/bin/python validation/real_reference_workloads.py crypto_perps_funding PATH/TO/PERP_BUNDLE
 .venv-pysystemtrade-accounting/bin/python validation/real_reference_workloads.py \
   pysystemtrade-trend validation/candidates/pysystemtrade
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py \
+  nautilus-dated-futures validation/candidates/pysystemtrade
 ```
 
 | Case | Same inputs and decisions | What the runner checks |
@@ -264,6 +266,7 @@ from the retained book strategies; they do not change the existing performance t
 | ETF and USD-quoted FX | Four symbols in each case. Historical closes become zero-spread quote observations. A 10/50 EMA crossover submits a fixed unit market order at the observable quote. The EMAs start from the average of the first full window. | Backtest, Nautilus Python, Nautilus Python with registered Rust indicators, and the bundled Nautilus Rust strategy must all match the independently computed fill timestamps, sides, sizes, prices, fees and final positions. |
 | BTC and ETH perpetual funding | Hold one long BTC and one short ETH position. Use the recorded eight-hour funding rates and historical opens as shared mark proxies. Both positions open after the first funding event. | Fill and funding timestamps, amounts and final holdings. The payment tolerance is one unit of Nautilus USDT precision (10⁻⁸ USDT); each side must reconcile the observed payments with its account balance. This tests the funding ledger, not venue mark quality or liquidation. |
 | Dated futures trend | Use the pinned upstream SP500 and GOLD sample data. The native pysystemtrade 16/64 EWMAC rule and a Polars implementation compute forecasts on the adjusted price series. Prior-session forecasts set positions; a fixed March 1, 2022 roll trades each leg at its own raw contract price. | Forecast values, fills inferred by pysystemtrade versus fills executed by Backtest, per-contract fees, daily equity, and Backtest's paired roll outcomes. This uses the forecast and accounting modules, not the full production order system. |
+| Nautilus dated futures | The same raw prices, fixed roll, contract sizes and fees. Nautilus submits market orders on both dated contracts and marks the account after both legs. | Fills, final holdings and daily marked equity. Nautilus retains unrealized P&L on open positions; Backtest realizes it into variation cash at each mark. The report retains both cash series without requiring them to match. |
 
 Add `--measure --output result.json` to run ten fresh processes per side after correctness
 passes. The report retains each sample, both wall and process CPU time for the run, and complete
@@ -281,8 +284,8 @@ A custom all-Rust strategy implements the
 [Rust strategy callbacks](https://nautilustrader.io/docs/latest/concepts/strategies/).
 
 These runs do not compare bid/ask spread, order book depth, resting-order queue priority,
-latency, currency conversion, continuous futures construction, native Nautilus futures
-settlement, or pysystemtrade's full portfolio sizing and buffering. The ETF and FX source
+latency, currency conversion, continuous futures construction, exchange
+settlement or delivery, or pysystemtrade's full portfolio sizing and buffering. The ETF and FX source
 timestamps are used as replay labels; the projected quotes are not historical order book data.
 
 ## Virtual Environment Setup

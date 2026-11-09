@@ -41,6 +41,8 @@ UNIVERSE = {
     "fx_pairs": ("AUD_USD", "EUR_USD", "GBP_USD", "NZD_USD"),
 }
 FUTURES_CASE = "pysystemtrade-trend"
+NAUTILUS_FUTURES_CASE = "nautilus-dated-futures"
+TREND_CASES = {FUTURES_CASE, NAUTILUS_FUTURES_CASE}
 FUNDING_CASE = "crypto_perps_funding"
 FUNDING_SIDES = ("ml4t", "nautilus")
 FUTURES_SIDES = ("ml4t", "pysystemtrade")
@@ -362,8 +364,6 @@ def run_nautilus_quotes(quotes: Quotes, case: str, side: str) -> tuple[dict, dic
 
 def quote_worker(case: str, bundle: Path, side: str) -> dict:
     quotes = load_quotes(case, bundle)
-    if side != "ml4t" and version("nautilus-trader") != NAUTILUS_VERSION:
-        raise ValueError(f"Expected NautilusTrader {NAUTILUS_VERSION}")
     ledger, timing = (
         run_ml4t_quotes(quotes, case) if side == "ml4t" else run_nautilus_quotes(quotes, case, side)
     )
@@ -409,7 +409,7 @@ def collect(case: str, source: Path, sides: tuple[str, ...], samples: int) -> di
     }
     if len({record["correctness"]["input_sha256"] for record in results.values()}) != 1:
         raise ValueError("Input projections differ between sides")
-    fields = ("ledger", "forecast") if case == FUTURES_CASE else ("ledger",)
+    fields = ("ledger", "forecast") if case in TREND_CASES else ("ledger",)
     for field in fields:
         reference = results[sides[0]]["correctness"][field]
         if any(record["correctness"][field] != reference for record in results.values()):
@@ -423,8 +423,8 @@ def collect(case: str, source: Path, sides: tuple[str, ...], samples: int) -> di
         for side in sides[i % len(sides) :] + sides[: i % len(sides)]:
             evidence = child(side)
             record = results[side]
-            for key in ("input_sha256", "rows", *stability_fields):
-                if evidence[key] != record["correctness"][key]:
+            for key in ("input_sha256", "rows", *stability_fields, "observed_cash_cents"):
+                if evidence.get(key) != record["correctness"].get(key):
                     raise ValueError(f"{side} changed {key} during measurement")
             record["samples"].append(evidence["timing"])
     for record in results.values():
@@ -435,19 +435,20 @@ def collect(case: str, source: Path, sides: tuple[str, ...], samples: int) -> di
                     "run_wall_seconds",
                     "run_cpu_seconds",
                     "process_wall_seconds",
-                    *(("forecast_wall_seconds",) if case == FUTURES_CASE else ()),
+                    *(("forecast_wall_seconds",) if case in TREND_CASES else ()),
                 )
             }
     return {
         "case": case,
         "bundle_sha256": FUNDING_BUNDLE if case == FUNDING_CASE else BUNDLES.get(case),
-        "pysystemtrade_commit": PYSYSTEMTRADE_COMMIT if case == FUTURES_CASE else None,
+        "pysystemtrade_commit": PYSYSTEMTRADE_COMMIT if case in TREND_CASES else None,
         "harness_sha256": {
             name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
             for name in (
                 "real_reference_workloads.py",
                 "pysystemtrade_trend.py",
                 "nautilus_funding.py",
+                "nautilus_dated_futures.py",
                 "reference_workloads.py",
                 "real_strategy_runner.py",
             )
@@ -462,7 +463,9 @@ def collect(case: str, source: Path, sides: tuple[str, ...], samples: int) -> di
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("case", choices=(*BUNDLES, FUTURES_CASE, FUNDING_CASE))
+    parser.add_argument(
+        "case", choices=(*BUNDLES, FUTURES_CASE, NAUTILUS_FUTURES_CASE, FUNDING_CASE)
+    )
     parser.add_argument("source", type=Path, help="Frozen bundle or pinned pysystemtrade checkout")
     parser.add_argument(
         "--measure", action="store_true", help="Run ten isolated repetitions per side"
@@ -475,23 +478,27 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     source = args.source.resolve()
-    sides = {FUTURES_CASE: FUTURES_SIDES, FUNDING_CASE: FUNDING_SIDES}.get(args.case, QUOTE_SIDES)
+    sides = {
+        FUTURES_CASE: FUTURES_SIDES,
+        NAUTILUS_FUTURES_CASE: FUNDING_SIDES,
+        FUNDING_CASE: FUNDING_SIDES,
+    }.get(args.case, QUOTE_SIDES)
     if args.worker:
         if args.worker not in sides:
             parser.error(f"{args.worker} is not a side of {args.case}")
-        if args.case == FUTURES_CASE:
+        if args.worker.startswith("nautilus") and version("nautilus-trader") != NAUTILUS_VERSION:
+            raise ValueError(f"Expected NautilusTrader {NAUTILUS_VERSION}")
+        if args.case in TREND_CASES:
             if args.worker == "pysystemtrade":
                 sys.path.insert(0, str(source))
             result = trend_worker(source, args.worker)
         elif args.case == FUNDING_CASE:
-            if args.worker == "nautilus" and version("nautilus-trader") != NAUTILUS_VERSION:
-                raise ValueError(f"Expected NautilusTrader {NAUTILUS_VERSION}")
             result = funding_worker(source, args.worker)
         else:
             result = quote_worker(args.case, source, args.worker)
         print(json.dumps(result, allow_nan=False))
         return
-    if args.case == FUTURES_CASE:
+    if args.case in TREND_CASES:
         verify_pysystemtrade_source(source)
     report = collect(args.case, source, sides, SAMPLE_COUNT if args.measure else 0)
     if args.output:
@@ -502,7 +509,7 @@ def main() -> None:
             f", {len(ledger['funding'])} funding payments"
             if args.case == FUNDING_CASE
             else f", {len(ledger['equity_cents'])} daily marks"
-            if args.case == FUTURES_CASE
+            if args.case in TREND_CASES
             else ""
         )
         print(

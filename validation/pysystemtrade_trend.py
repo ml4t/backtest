@@ -12,6 +12,7 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
+from nautilus_dated_futures import run_nautilus_trend
 from reference_workloads import CASH, verify
 
 ROOTS = ("SP500", "GOLD")
@@ -286,11 +287,15 @@ def trend_worker(source: Path, side: str) -> dict:
     signal = forecasts(inputs, side)
     targets = positions(inputs, signal)
     forecast_wall = perf_counter() - start_wall
-    actual = (
-        run_pysystemtrade_trend(inputs, targets)
-        if side == "pysystemtrade"
-        else run_ml4t_trend(inputs, targets)
-    )
+    extra = {}
+    if side == "nautilus":
+        actual, cash = run_nautilus_trend(inputs, targets)
+        extra["observed_cash_cents"] = cash
+    elif side == "pysystemtrade":
+        actual = run_pysystemtrade_trend(inputs, targets)
+    else:
+        actual = run_ml4t_trend(inputs, targets)
+        extra["observed_cash_cents"] = actual["equity_cents"]
     timing = {
         "run_wall_seconds": perf_counter() - start_wall,
         "run_cpu_seconds": process_time() - start_cpu,
@@ -302,6 +307,7 @@ def trend_worker(source: Path, side: str) -> dict:
             json.dumps(inputs.source_files, sort_keys=True).encode()
         ).hexdigest(),
         "source_files": inputs.source_files,
+        **extra,
         "rows": len(inputs.dates),
         "ledger": actual,
         "forecast": {
