@@ -11,7 +11,8 @@ import platform
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
-from importlib.metadata import distribution, distributions, version
+from importlib import import_module
+from importlib.metadata import distributions, version
 from pathlib import Path
 from statistics import median
 from time import perf_counter
@@ -111,7 +112,7 @@ def run_ml4t(tape: Tape) -> tuple[dict[str, Any], float]:
     from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
     from ml4t.backtest.config import CommissionType, ExecutionMode, ExecutionPrice
 
-    timestamps = tape.index.to_pydatetime().tolist()
+    timestamps = [pd.Timestamp(stamp).to_pydatetime() for stamp in tape.index]
     row_by_time = {stamp: i for i, stamp in enumerate(timestamps)}
     prices = pl.DataFrame(
         {
@@ -197,49 +198,35 @@ def run_ml4t(tape: Tape) -> tuple[dict[str, Any], float]:
 
 
 def run_nautilus(tape: Tape, interval: str) -> tuple[dict[str, Any], float]:
-    from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
-    from nautilus_trader.common import LoggerConfig
-    from nautilus_trader.execution import FixedFeeModel
-    from nautilus_trader.model import (
-        AccountType,
-        Bar,
-        BarType,
-        Currency,
-        Equity,
-        InstrumentId,
-        Money,
-        OmsType,
-        OrderSide,
-        Price,
-        Quantity,
-        Symbol,
-        Venue,
-    )
-    from nautilus_trader.trading import Strategy
+    backtest: Any = import_module("nautilus_trader.backtest")
+    model: Any = import_module("nautilus_trader.model")
+    logger_config = import_module("nautilus_trader.common").LoggerConfig
+    fee_model = import_module("nautilus_trader.execution").FixedFeeModel
+    strategy: Any = import_module("nautilus_trader.trading").Strategy
 
-    usd = Currency.from_str("USD")
-    venue = Venue("XNAS")
+    usd = model.Currency.from_str("USD")
+    venue = model.Venue("XNAS")
     instruments = {
-        symbol: Equity(
-            InstrumentId(Symbol(symbol), venue),
-            Symbol(symbol),
+        symbol: model.Equity(
+            model.InstrumentId(model.Symbol(symbol), venue),
+            model.Symbol(symbol),
             usd,
             2,
-            Price(0.01, 2),
+            model.Price(0.01, 2),
             0,
             0,
-            lot_size=Quantity.from_int(1),
+            lot_size=model.Quantity.from_int(1),
         )
         for symbol in tape.prices
     }
     bar_types = {
-        symbol: BarType.from_str(f"{instrument.id}-1-{interval}-LAST-EXTERNAL")
+        symbol: model.BarType.from_str(f"{instrument.id}-1-{interval}-LAST-EXTERNAL")
         for symbol, instrument in instruments.items()
     }
     timestamps = [stamp.value for stamp in tape.index]
     row_by_time = {stamp: i for i, stamp in enumerate(timestamps)}
 
-    class Targets(Strategy):
+    class Targets(strategy):
         def on_start(self):
             for bar_type in bar_types.values():
                 self.subscribe_bars(bar_type)
@@ -253,34 +240,36 @@ def run_nautilus(tape: Tape, interval: str) -> tuple[dict[str, Any], float]:
                 self.submit_order(
                     self.order_factory.market(
                         instrument_id,
-                        OrderSide.BUY if delta > 0 else OrderSide.SELL,
-                        Quantity.from_int(abs(delta)),
+                        model.OrderSide.BUY if delta > 0 else model.OrderSide.SELL,
+                        model.Quantity.from_int(abs(delta)),
                     )
                 )
 
-    engine = BacktestEngine(
-        BacktestEngineConfig(logging=LoggerConfig(bypass_logging=True), run_analysis=False)
+    engine = backtest.BacktestEngine(
+        backtest.BacktestEngineConfig(
+            logging=logger_config(bypass_logging=True), run_analysis=False
+        )
     )
     try:
         engine.add_venue(
             venue,
-            OmsType.NETTING,
-            AccountType.CASH,
-            [Money(CASH, usd)],
-            fee_model=FixedFeeModel(Money(0, usd)),
+            model.OmsType.NETTING,
+            model.AccountType.CASH,
+            [model.Money(CASH, usd)],
+            fee_model=fee_model(model.Money(0, usd)),
             bar_execution=True,
         )
         for instrument in instruments.values():
             engine.add_instrument(instrument)
         engine.add_data(
             [
-                Bar(
+                model.Bar(
                     bar_types[symbol],
-                    Price((close - 2) / 100, 2),
-                    Price((close + 3) / 100, 2),
-                    Price((close - 4) / 100, 2),
-                    Price(close / 100, 2),
-                    Quantity.from_int(10_000),
+                    model.Price((close - 2) / 100, 2),
+                    model.Price((close + 3) / 100, 2),
+                    model.Price((close - 4) / 100, 2),
+                    model.Price(close / 100, 2),
+                    model.Quantity.from_int(10_000),
                     timestamps[i],
                     timestamps[i],
                 )
@@ -318,17 +307,15 @@ def run_nautilus(tape: Tape, interval: str) -> tuple[dict[str, Any], float]:
 
 
 def run_pysystemtrade(tape: Tape) -> tuple[dict[str, Any], float]:
-    from sysobjects.instruments import instrumentCosts
-    from systems.accounts.pandl_calculators.pandl_cash_costs import (
-        pandlCalculationWithCashCostsAndFills,
-    )
+    instruments: Any = import_module("sysobjects.instruments")
+    accounting: Any = import_module("systems.accounts.pandl_calculators.pandl_cash_costs")
 
     calculations = {
-        symbol: pandlCalculationWithCashCostsAndFills(
+        symbol: accounting.pandlCalculationWithCashCostsAndFills(
             price=pd.Series([price / 100 for price in prices], index=tape.index),
             positions=pd.Series(tape.targets[symbol], index=tape.index),
             value_per_point=VALUE_PER_POINT,
-            raw_costs=instrumentCosts(value_of_block_commission=FUTURES_FEE),
+            raw_costs=instruments.instrumentCosts(value_of_block_commission=FUTURES_FEE),
             rolls_per_year=0,
             vol_normalise_currency_costs=False,
             roundpositions=False,
@@ -347,7 +334,7 @@ def run_pysystemtrade(tape: Tape) -> tuple[dict[str, Any], float]:
     }
     seconds = perf_counter() - started
     pnl = pd.DataFrame({symbol: outputs[0] for symbol, outputs in native.items()})
-    if not pnl.index.equals(tape.index) or pnl.isna().any().any():
+    if not pnl.index.equals(tape.index) or pnl.isna().to_numpy().any():
         raise ValueError("pysystemtrade did not return a complete aligned P&L series")
     equity = [round(x * 100) for x in (CASH + pnl.sum(axis=1).cumsum())]
     row_by_time = {stamp: i for i, stamp in enumerate(tape.index)}
@@ -384,7 +371,19 @@ def verify(actual: dict, expected: dict) -> None:
             raise ValueError(f"{field}: actual {observed!r}; expected {wanted!r}")
 
 
-def worker(workload: Workload, side: str) -> dict:
+def verify_pysystemtrade_source(source: Path) -> None:
+    def git(*args: str) -> str:
+        return subprocess.check_output(
+            ["git", "-C", str(source), *args], text=True, timeout=15
+        ).strip()
+
+    if Path(git("rev-parse", "--show-toplevel")) != source:
+        raise ValueError("Point --pysystemtrade-source to the checkout root")
+    if git("rev-parse", "HEAD") != PYSYSTEMTRADE_COMMIT or git("status", "--porcelain"):
+        raise ValueError(f"Use a clean pysystemtrade checkout at {PYSYSTEMTRADE_COMMIT}")
+
+
+def worker(workload: Workload, side: str, pysystemtrade_source: Path | None) -> dict:
     tape = make_tape(workload)
     if side == "ml4t":
         package = "ml4t-backtest"
@@ -396,14 +395,9 @@ def worker(workload: Workload, side: str) -> dict:
         ledger, elapsed = run_nautilus(tape, workload.interval)
     else:
         package = "pysystemtrade"
-        if version(package) != PYSYSTEMTRADE_VERSION:
-            raise ValueError(
-                f"Expected {package} {PYSYSTEMTRADE_VERSION}; found {version(package)}"
-            )
-        direct_url = distribution(package).read_text("direct_url.json")
-        provenance = json.loads(direct_url) if direct_url else {}
-        if provenance.get("vcs_info", {}).get("commit_id") != PYSYSTEMTRADE_COMMIT:
-            raise ValueError(f"Install pysystemtrade from Git commit {PYSYSTEMTRADE_COMMIT}")
+        if pysystemtrade_source is None:
+            raise ValueError("Provide --pysystemtrade-source")
+        sys.path.insert(0, str(pysystemtrade_source))
         ledger, elapsed = run_pysystemtrade(tape)
     verify(ledger, expected_ledger(tape))
     input_sha256 = hashlib.sha256(
@@ -419,13 +413,13 @@ def worker(workload: Workload, side: str) -> dict:
     return {
         "input_sha256": input_sha256,
         "package": package,
-        "version": version(package),
+        "version": PYSYSTEMTRADE_VERSION if package == "pysystemtrade" else version(package),
         "native_seconds": elapsed,
         "ledger": ledger,
     }
 
 
-def collect(case: str, samples: int) -> dict:
+def collect(case: str, samples: int, pysystemtrade_source: Path | None) -> dict:
     env = dict(
         os.environ,
         OMP_NUM_THREADS="1",
@@ -440,13 +434,11 @@ def collect(case: str, samples: int) -> dict:
         return os.getloadavg() if hasattr(os, "getloadavg") else None
 
     def run_child(side: str) -> tuple[dict, float]:
+        command = [sys.executable, str(Path(__file__).resolve()), case, "--worker", side]
+        if pysystemtrade_source is not None:
+            command.extend(["--pysystemtrade-source", str(pysystemtrade_source)])
         started = perf_counter()
-        output = subprocess.check_output(
-            [sys.executable, str(Path(__file__).resolve()), case, "--worker", side],
-            env=env,
-            text=True,
-            timeout=300,
-        )
+        output = subprocess.check_output(command, env=env, text=True, timeout=300)
         elapsed = perf_counter() - started
         return json.loads(output), elapsed
 
@@ -485,6 +477,7 @@ def collect(case: str, samples: int) -> dict:
             }
     return {
         "case": case,
+        "pysystemtrade_commit": PYSYSTEMTRADE_COMMIT if pysystemtrade_source else None,
         "workload": asdict(WORKLOADS[case]),
         "logical_cpus": os.cpu_count(),
         "packages": {
@@ -502,16 +495,22 @@ def collect(case: str, samples: int) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("case", choices=WORKLOADS)
+    parser.add_argument("--pysystemtrade-source", type=Path, help="Pinned source checkout.")
     parser.add_argument("--worker", choices=("reference", "ml4t"), help=argparse.SUPPRESS)
     parser.add_argument("--measure", action="store_true", help="Run ten isolated timed pairs.")
     parser.add_argument(
         "--output", type=Path, help="Write full ledger and sample evidence to JSON."
     )
     args = parser.parse_args()
+    source = args.pysystemtrade_source.resolve() if args.pysystemtrade_source else None
+    if (args.case == "pysystemtrade-futures") != (source is not None):
+        parser.error("--pysystemtrade-source is required only for pysystemtrade-futures")
     if args.worker:
-        print(json.dumps(worker(WORKLOADS[args.case], args.worker), allow_nan=False))
+        print(json.dumps(worker(WORKLOADS[args.case], args.worker, source), allow_nan=False))
         return
-    report = collect(args.case, SAMPLE_COUNT if args.measure else 0)
+    if source is not None:
+        verify_pysystemtrade_source(source)
+    report = collect(args.case, SAMPLE_COUNT if args.measure else 0, source)
     if args.output:
         args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
     for side, evidence in report["sides"].items():

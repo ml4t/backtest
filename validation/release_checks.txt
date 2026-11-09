@@ -40,3 +40,4 @@ validation/native/backtrader_behavior.py
 validation/native/zipline_behavior.py
 validation/native/lean_behavior.py
 validation/scenarios/definitions.py
+validation/reference_workloads.py

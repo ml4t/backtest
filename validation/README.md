@@ -211,17 +211,25 @@ $2 per-contract fee. It compares the accounting step after targets are known, wi
 forecast generation, contract selection, rolls or broker simulation on the pysystemtrade side.
 Its calculation time is not an engine speed comparison.
 
-From the repository root, create the two Python 3.13 environments and run the comparisons:
+From the repository root, create the two Python 3.13 environments and fetch the pinned
+pysystemtrade source. The runner imports its accounting modules from that checkout. This avoids
+installing the separate broker and PDF-reporting dependencies of the full application.
 
 ```bash
 uv venv --python 3.13 .venv-nautilus-v2
 uv pip sync --python .venv-nautilus-v2/bin/python validation/environments/nautilus/requirements.txt
-uv venv --python 3.13 .venv-pysystemtrade-current
-uv pip sync --python .venv-pysystemtrade-current/bin/python validation/environments/pysystemtrade/requirements.txt
+uv venv --python 3.13 .venv-pysystemtrade-accounting
+uv pip sync --python .venv-pysystemtrade-accounting/bin/python validation/environments/pysystemtrade/requirements.txt
+
+git init validation/candidates/pysystemtrade
+git -C validation/candidates/pysystemtrade fetch --depth 1 \
+  https://github.com/pst-group/pysystemtrade.git bbf5cf823e16be1cca27493a94099eb8cf33f6e7
+git -C validation/candidates/pysystemtrade checkout --detach FETCH_HEAD
 
 .venv-nautilus-v2/bin/python validation/reference_workloads.py nautilus-daily
 .venv-nautilus-v2/bin/python validation/reference_workloads.py nautilus-minute
-.venv-pysystemtrade-current/bin/python validation/reference_workloads.py pysystemtrade-futures
+.venv-pysystemtrade-accounting/bin/python validation/reference_workloads.py pysystemtrade-futures \
+  --pysystemtrade-source validation/candidates/pysystemtrade
 ```
 
 Add `--measure --output result.json` to retain the verified ledgers and ten isolated timing
