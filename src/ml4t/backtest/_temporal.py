@@ -51,20 +51,24 @@ def temporal_row(frame: pl.DataFrame, index: int) -> dict[str, Any]:
 
 
 @overload
-def temporal_rows(frame: pl.DataFrame, *, named: Literal[True]) -> Iterator[dict[str, Any]]: ...
+def temporal_rows(
+    frame: pl.DataFrame, *, named: Literal[True], unused_column: str | None = None
+) -> Iterator[dict[str, Any]]: ...
 
 
 @overload
 def temporal_rows(
-    frame: pl.DataFrame, *, named: Literal[False] = False
+    frame: pl.DataFrame, *, named: Literal[False] = False, unused_column: str | None = None
 ) -> Iterator[tuple[Any, ...]]: ...
 
 
-def temporal_rows(frame: pl.DataFrame, *, named: bool = False) -> Any:
+def temporal_rows(
+    frame: pl.DataFrame, *, named: bool = False, unused_column: str | None = None
+) -> Any:
     precise = {
         index: (name, timestamp_values(frame[name]))
         for index, (name, dtype) in enumerate(frame.schema.items())
-        if isinstance(dtype, pl.Datetime) and dtype.time_unit == "ns"
+        if name != unused_column and isinstance(dtype, pl.Datetime) and dtype.time_unit == "ns"
     }
     rows = frame.iter_rows(named=named)
     if not precise:

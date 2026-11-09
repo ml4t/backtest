@@ -305,6 +305,26 @@ class DataFeed:
         self._price_ask_size_idx = (
             price_cols.index(self._ask_size_col) if self._ask_size_col in price_cols else -1
         )
+        self._unused_price_timestamp_col = (
+            None
+            if self._timestamp_col
+            in (
+                self._entity_col,
+                self._open_col,
+                self._high_col,
+                self._low_col,
+                self._close_col,
+                self._price_col,
+                self._volume_col,
+                self._vwap_col,
+                self._bid_col,
+                self._ask_col,
+                self._mid_col,
+                self._bid_size_col,
+                self._ask_size_col,
+            )
+            else self._timestamp_col
+        )
 
         if self.signals is not None:
             signal_cols = self.signals.columns
@@ -616,7 +636,7 @@ class DataFeed:
         # Convert price DataFrame slice to dicts (lazy, only current bar)
         price_df = self._slice_for_timestamp(self.prices, self._price_ranges_by_ts, ts)
         if price_df is not None:
-            for row in temporal_rows(price_df, named=False):
+            for row in temporal_rows(price_df, unused_column=self._unused_price_timestamp_col):
                 asset = row[price_entity_idx]
                 close = row[price_close_idx] if price_close_idx >= 0 else None
                 price = row[price_price_idx] if price_price_idx >= 0 else close
@@ -695,7 +715,7 @@ class DataFeed:
             signal_entity_idx = self._signal_entity_idx
             signal_col_indices = self._signal_col_indices
             signal_columns = self._signal_columns
-            for row in temporal_rows(signal_df, named=False):
+            for row in temporal_rows(signal_df, unused_column=self._timestamp_col):
                 asset = row[signal_entity_idx]
                 if asset in assets_data:
                     asset_signals = assets_data._signals[asset]
@@ -706,7 +726,7 @@ class DataFeed:
         context_data: dict[str, Any] = {}
         ctx_df = self._slice_for_timestamp(self.context, self._context_ranges_by_ts, ts)
         if ctx_df is not None and len(ctx_df) > 0:
-            row = next(temporal_rows(ctx_df))
+            row = next(temporal_rows(ctx_df, unused_column=self._timestamp_col))
             for i, col_idx in enumerate(self._context_col_indices):
                 context_data[self._context_columns[i]] = row[col_idx]
 

@@ -104,6 +104,23 @@ def test_ns_known_at_and_history_cannot_merge_a_future_observation():
     ]
 
 
+def test_feed_preserves_signal_and_context_payload_timestamps():
+    prices = pl.DataFrame(
+        {"timestamp": instants([1, 2]), "asset": ["TEST", "TEST"], "close": [100.0, 110.0]}
+    )
+    signals = pl.DataFrame(
+        {"timestamp": instants([1]), "asset": ["TEST"], "published_at": instants([1])}
+    )
+    context = pl.DataFrame({"timestamp": instants([2]), "calculated_at": instants([2])})
+    first, second = _instant_feed(prices_df=prices, signals_df=signals, context_df=context)
+    assert first[0].value == BASE + 1
+    assert first[1]["TEST"]["signals"]["published_at"].value == BASE + 1
+    assert first[2] == {}
+    assert second[0].value == BASE + 2
+    assert second[1]["TEST"]["signals"] == {}
+    assert second[2]["calculated_at"].value == BASE + 2
+
+
 def test_ns_cash_events_apply_to_their_actual_separate_quotes_and_survive_save(tmp_path):
     frame = pl.DataFrame(
         {"timestamp": instants([1, 2, 3]), "asset": ["TEST"] * 3, "close": [100.0, 110.0, 120.0]}
