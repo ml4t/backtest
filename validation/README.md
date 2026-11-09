@@ -243,6 +243,48 @@ NautilusTrader 1.221.0 correctly rejects those bars. The adapter also failed whe
 multiple instrument bars with equal timestamps in that version. Neither result establishes a
 limitation of daily or minute bars in NautilusTrader.
 
+### Native strategies on historical data
+
+`real_reference_workloads.py` uses the same pinned environments as the small native workloads.
+For ETF, FX and perpetual cases, use the matching frozen directory from the
+[real-strategy evidence](REAL_STRATEGY_RESULTS.json). The runner verifies the bundle and
+its file hashes before projecting the market data. These cases use different decision rules
+from the retained book strategies; they do not change the existing performance tables.
+
+```bash
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py etfs PATH/TO/ETF_BUNDLE
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py fx_pairs PATH/TO/FX_BUNDLE
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py crypto_perps_funding PATH/TO/PERP_BUNDLE
+.venv-pysystemtrade-accounting/bin/python validation/real_reference_workloads.py \
+  pysystemtrade-trend validation/candidates/pysystemtrade
+```
+
+| Case | Same inputs and decisions | What the runner checks |
+| --- | --- | --- |
+| ETF and USD-quoted FX | Four symbols in each case. Historical closes become zero-spread quote observations. A 10/50 EMA crossover submits a fixed unit market order at the observable quote. The EMAs start from the average of the first full window. | Backtest, Nautilus Python, Nautilus Python with registered Rust indicators, and the bundled Nautilus Rust strategy must all match the independently computed fill timestamps, sides, sizes, prices, fees and final positions. |
+| BTC and ETH perpetual funding | Hold one long BTC and one short ETH position. Use the recorded eight-hour funding rates and historical opens as shared mark proxies. Both positions open after the first funding event. | Fill and funding timestamps, amounts and final holdings. The payment tolerance is one unit of Nautilus USDT precision (10⁻⁸ USDT); each side must reconcile the observed payments with its account balance. This tests the funding ledger, not venue mark quality or liquidation. |
+| Dated futures trend | Use the pinned upstream SP500 and GOLD sample data. The native pysystemtrade 16/64 EWMAC rule and a Polars implementation compute forecasts on the adjusted price series. Prior-session forecasts set positions; a fixed March 1, 2022 roll trades each leg at its own raw contract price. | Forecast values, fills inferred by pysystemtrade versus fills executed by Backtest, per-contract fees, daily equity, and Backtest's paired roll outcomes. This uses the forecast and accounting modules, not the full production order system. |
+
+Add `--measure --output result.json` to run ten fresh processes per side after correctness
+passes. The report retains each sample, both wall and process CPU time for the run, and complete
+process wall time. In the ETF, FX and funding cases the run timer starts after data and strategy
+registration. In the futures case the run includes the forecast, position construction and
+accounting or execution. Compare only the scopes that perform the same work. The futures report
+also gives a separate forecast and target construction interval.
+
+The Nautilus Rust example uses the same simulated venue and native instruments as the two
+Nautilus Python versions. The Python strategy callback still receives each quote when it uses
+the Rust indicator. Nautilus describes
+[`add_builtin_strategy`](https://github.com/nautechsystems/nautilus_trader/blob/d53849b216e20f2c122ca01b4dd0da377638b186/crates/backtest/src/python/engine.rs)
+as a way to share bundled examples, not a general loader for a user's custom native strategy.
+A custom all-Rust strategy implements the
+[Rust strategy callbacks](https://nautilustrader.io/docs/latest/concepts/strategies/).
+
+These runs do not compare bid/ask spread, order book depth, resting-order queue priority,
+latency, currency conversion, continuous futures construction, native Nautilus futures
+settlement, or pysystemtrade's full portfolio sizing and buffering. The ETF and FX source
+timestamps are used as replay labels; the projected quotes are not historical order book data.
+
 ## Virtual Environment Setup
 
 ```bash

@@ -41,3 +41,6 @@ validation/native/zipline_behavior.py
 validation/native/lean_behavior.py
 validation/scenarios/definitions.py
 validation/reference_workloads.py
+validation/real_reference_workloads.py
+validation/nautilus_funding.py
+validation/pysystemtrade_trend.py
