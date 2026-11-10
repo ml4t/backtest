@@ -2,6 +2,11 @@
 
 Event-driven backtesting engine with configurable execution semantics, validated against four independent frameworks.
 
+**No machine learning required.** Run a Python strategy with market data alone, or pass signals
+and model predictions if your strategy uses them. The [first backtest](getting-started/quickstart.md)
+uses only prices and a simple trading rule.
+
+
 Use `ml4t-backtest` when notebook research is no longer enough and you need explicit,
 reproducible answers to practical execution questions: when orders fill, how stops trigger,
 how cash is reserved, and how results change when you match another framework's behavior.

@@ -4,7 +4,11 @@
 [![PyPI](https://img.shields.io/pypi/v/ml4t-backtest)](https://pypi.org/project/ml4t-backtest/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Event-driven backtesting for quantitative strategies with configurable execution, accounting, risk, and framework-parity validation.
+Event-driven backtesting for quantitative strategies with configurable execution, accounting, and risk.
+
+**No machine learning required.** Pass market data and a Python strategy. The strategy can use
+rules such as price breakouts, moving averages, or scheduled rebalancing. Supply signals or model
+predictions only if your strategy uses them.
 
 ## Part of the ML4T Library Ecosystem
 
@@ -66,51 +70,46 @@ then covers orders, multi-asset portfolios, costs, account rules, risk, and resu
 from datetime import datetime
 
 import polars as pl
-from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
 
-class SignalStrategy(Strategy):
+
+class PriceBreakout(Strategy):
     def on_data(self, timestamp, data, context, broker):
-        for asset, bar in data.items():
-            signal = bar.get("signals", {}).get("prediction", 0)
-            price = bar.get("price", bar.get("close", 0))
-            position = broker.get_position(asset)
+        close = data["AAPL"]["close"]
+        position = broker.get_position("AAPL")
+        if position is None and close > 100:
+            broker.submit_order("AAPL", 10)
+        elif position is not None and close < 100:
+            broker.close_position("AAPL")
 
-            if position is None and signal > 0.5:
-                shares = (broker.get_account_value() * 0.10) / price
-                if shares > 0:
-                    broker.submit_order(asset, shares)
-            elif position is not None and signal < -0.5:
-                broker.close_position(asset)
 
-timestamps = [datetime(2024, 1, day) for day in (2, 3, 4, 5)]
 prices = pl.DataFrame(
     {
-        "timestamp": timestamps,
-        "asset": ["AAPL"] * 4,
-        "close": [100.0, 101.0, 103.0, 102.0],
-    }
-)
-signals = pl.DataFrame(
-    {
-        "timestamp": timestamps,
-        "asset": ["AAPL"] * 4,
-        "prediction": [1.0, 1.0, -1.0, -1.0],
+        "timestamp": [datetime(2024, 1, day) for day in (2, 3, 4, 5, 8)],
+        "asset": ["AAPL"] * 5,
+        "open": [100.0, 100.0, 102.0, 98.0, 100.0],
+        "close": [100.0, 101.0, 102.0, 99.0, 100.0],
     }
 )
 
-config = BacktestConfig(initial_cash=100_000)
-feed = DataFeed(prices_df=prices, signals_df=signals)
-engine = Engine(feed, SignalStrategy(), config)
-result = engine.run()
+result = Engine(
+    DataFeed(prices_df=prices),
+    PriceBreakout(),
+    BacktestConfig(initial_cash=100_000),
+).run()
 
-print(f"Total Return: {result.metrics['total_return_pct']:.2f}%")
-print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
-print(result.to_fills_dataframe().head())
+for fill in result.fills:
+    print(f"{fill.timestamp:%Y-%m-%d} {fill.side.value} {fill.quantity:g} @ ${fill.price:.2f}")
 ```
 
-Each `Engine` instance is single-use. Create a new instance for every independent run.
+<!-- ml4t-doc-output: readme-quickstart -->
+```text
+2024-01-04 buy 10 @ $102.00
+2024-01-08 sell 10 @ $100.00
+```
 
-`bar["price"]` follows `FeedSpec.price_col` when you provide one, so the same strategy works for close-based bars and quote-aware feeds.
+The rule reads each session's close. Orders fill at the next session's open under the default
+execution settings. Each `Engine` instance is single-use; create a new one for an independent run.
 
 ## Risk Management
 
