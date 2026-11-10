@@ -508,9 +508,17 @@ class DataFeed:
             df = df.sort(self._timestamp_col, maintain_order=True)
 
         timestamps = df.get_column(self._timestamp_col)
-        if isinstance(timestamps.dtype, pl.Datetime) and timestamps.dtype.time_unit == "ns":
-            timestamps = timestamp_values(timestamps)
         result: dict[datetime, tuple[int, int]] = {}
+        if isinstance(timestamps.dtype, pl.Datetime) and timestamps.dtype.time_unit == "ns":
+            runs = timestamps.rle()
+            offset = 0
+            for ts, length in zip(
+                timestamp_values(runs.struct.field("value")), runs.struct.field("len"), strict=True
+            ):
+                result[ts] = (offset, length)
+                offset += length
+            return df, result
+
         if len(timestamps) == 0:
             return df, result
 
