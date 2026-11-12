@@ -243,6 +243,33 @@ NautilusTrader 1.221.0 correctly rejects those bars. The adapter also failed whe
 multiple instrument bars with equal timestamps in that version. Neither result establishes a
 limitation of daily or minute bars in NautilusTrader.
 
+### Marketable orders against historical depth
+
+The Chimera comparison replays the first hour of the
+[Bybit XRPUSDT L2 order book](https://quote-saver.bycsi.com/orderbook/linear/XRPUSDT/2024-12-01_XRPUSDT_ob500.data.zip)
+on 2024-12-01. It compares the displayed-depth replay API with the NautilusTrader
+2.0.0rc8 L2 matcher. Install the pinned Nautilus environment above and download
+the matching [trade archive](https://public.bybit.com/trading/XRPUSDT/XRPUSDT2024-12-01.csv.gz).
+The script verifies both archive hashes before using the data.
+
+```bash
+.venv-nautilus-v2/bin/python validation/chimera_depth_comparison.py \
+  2024-12-01_XRPUSDT_ob500.data.zip XRPUSDT2024-12-01.csv.gz
+```
+
+The second IOC order in each group depends on the first order's fills and
+the strategy's position. The comparison checks order time, side, size and
+limit, plus each fill's time, price, size and fee. It compares liquidity
+reuse and size-at-match refresh. The carry-consumption scenario is reported
+separately because it uses a different assumption. A difference in fill
+volume between policies includes the effect of their different subsequent
+orders. This replay checks correctness and does not collect performance samples.
+
+The archived book drives marketable executions. The trade archive quantifies
+timestamp ties and cannot recover their causal order. These archives also
+lack the information needed to estimate hidden liquidity or qualify passive
+queue fills.
+
 ## Virtual Environment Setup
 
 ```bash
