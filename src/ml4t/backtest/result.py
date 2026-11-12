@@ -25,7 +25,7 @@ import json
 import math
 from collections.abc import ItemsView, Iterable, KeysView
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import sha256
 from itertools import chain
 from pathlib import Path
@@ -1049,6 +1049,73 @@ class BacktestResult:
                 "end": end,
             },
         }
+
+    def to_order_trace(self, *, currency: str | None = None) -> dict[str, Any]:
+        """Return the JSON-compatible order trace recorded with intent history enabled.
+
+        Use holdings sampling to include position checkpoints. The simulation's
+        fill IDs are local to this result. Supply the quote currency when the
+        instrument did not declare one. Broker receipt times are unavailable.
+        """
+        from ml4t.specs import ExecutionFill
+        from ml4t.specs import OrderSide as SpecOrderSide
+
+        if "trace_orders" not in self.metrics:
+            raise ArtifactError("Order trace requires retain_intent_history=True")
+        spec = self.to_spec_dict()
+        orders = self.metrics["trace_orders"]
+        order_ids = {order["order_id"] for order in orders}
+        fills = [
+            ExecutionFill(
+                order_id=fill.order_id,
+                execution_id=str(index),
+                asset=fill.asset,
+                side=SpecOrderSide(fill.side.value),
+                quantity=fill.quantity,
+                price=fill.price,
+                executed_at=(
+                    fill.timestamp.replace(tzinfo=UTC)
+                    if fill.timestamp.tzinfo is None
+                    else fill.timestamp.astimezone(UTC)
+                ),
+                fee=fill.commission,
+                fee_currency=fill.currency or currency,
+                currency=fill.currency or currency,
+                multiplier=fill.multiplier,
+            ).to_dict()
+            for index, fill in enumerate(self.fills)
+            if fill.order_id in order_ids
+        ]
+        account = self.to_portfolio_state_dataframe()
+        final = None
+        if not account.is_empty():
+            final = account.row(-1, named=True)
+            final = {
+                "timestamp": final["timestamp"],
+                "cash": final["cash"],
+                "equity": final["equity"],
+                "positions": {
+                    row["asset"]: row["quantity"]
+                    for row in self.to_holdings_dataframe()
+                    .filter(pl.col("observation_id") == final["observation_id"])
+                    .iter_rows(named=True)
+                }
+                if final["holdings_complete"]
+                else None,
+            }
+        return _serialize_metric_value(
+            {
+                "schema_version": 1,
+                "source": "backtest",
+                "targets": spec["target_intents"],
+                "children": spec["child_order_intents"],
+                "orders": orders,
+                "reconciliations": spec["intent_reconciliations"],
+                "fills": fills,
+                "account": final,
+            },
+            path="order_trace",
+        )
 
     # Dict-like access keeps validation scripts and older notebook code working.
     def __getitem__(self, key: str) -> Any:

@@ -933,6 +933,26 @@ class Engine:
         if retain_intent_history:
             contract_evidence.update(
                 {
+                    "trace_orders": [
+                        {
+                            "order_id": order.order_id,
+                            "child_intent_id": order.child_intent_id,
+                            "asset": order.asset,
+                            "side": order.side.value,
+                            "quantity": order.quantity,
+                            "status": order.status.value,
+                            "created_at": order.created_at.isoformat()
+                            if order.created_at
+                            else None,
+                            "cancelled_at": (
+                                order.cancelled_at.isoformat() if order.cancelled_at else None
+                            ),
+                            "rejection_reason": order.rejection_reason,
+                            "replaces_order_id": None,
+                        }
+                        for order in self.broker.orders
+                        if order.child_intent_id is not None
+                    ],
                     "target_intents": [
                         intent.to_dict() for intent in self.preopen_target_manager.targets
                     ],

@@ -731,3 +731,20 @@ Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-
 - [Configuration](configuration.md) -- complete reference for all 40+ parameters
 - [Profiles](profiles.md) -- pre-configured settings for each framework
 - [Risk Management](risk-management.md) -- position rules and portfolio limits
+
+## Replay displayed depth
+
+`ml4t.backtest.execution.depth.DisplayedDepthBook` supports marketable
+immediate-or-cancel replay from snapshots and incremental price-level
+updates. It uses integer price ticks and quantity lots. This API runs
+separately from the bar-based Engine.
+
+Choose how simulated consumption affects later orders. `REUSE` allows the
+same displayed lots to be filled again. `REFRESH_LEVEL` clears prior
+consumption when a level update arrives. `REFRESH_SIZE_AT_MATCH` clears it
+when the size visible at the next match differs from the last observed size
+at a match. `CARRY_CONSUMPTION` retains prior consumption up to the current
+displayed size until a level is removed or the book is reset. These settings
+describe scenarios for displayed liquidity. Hidden liquidity, passive queue
+position and market response to the simulated orders require additional
+observations or assumptions.
