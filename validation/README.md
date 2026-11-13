@@ -76,7 +76,7 @@ The table reports engine-call wall time for all 17 correctness-passing pairs. Th
 
 Backtest measured 2026-10-21; reference measurements dated 2026-10-13 were retained unchanged. Host: `Linux-7.0.0-38-generic-x86_64-with-glibc2.43` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
-A performance-impact review retains these measurements for engine source `28c47d6eb270`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun. Dependency validation checks selected packages and artifacts; allowing prereleases without changing those selections does not invalidate the measurements.
+A performance-impact review retains these measurements for engine source `ac87b9af6dcb`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun. Dependency validation checks selected packages and artifacts; allowing prereleases without changing those selections does not invalidate the measurements.
 
 ### Synthetic diagnostic scenarios
 
@@ -242,6 +242,35 @@ route uses the 1.x API. Its synthetic generator can put the open outside the hig
 NautilusTrader 1.221.0 correctly rejects those bars. The adapter also failed when sorting
 multiple instrument bars with equal timestamps in that version. Neither result establishes a
 limitation of daily or minute bars in NautilusTrader.
+
+### Marketable orders against historical depth
+
+The Chimera comparison replays the first hour of the
+[Bybit XRPUSDT L2 order book](https://quote-saver.bycsi.com/orderbook/linear/XRPUSDT/2024-12-01_XRPUSDT_ob500.data.zip)
+on 2024-12-01. It compares the displayed-depth replay API with the NautilusTrader
+2.0.0rc8 L2 matcher. Download both the order book and the matching
+[trade archive](https://public.bybit.com/trading/XRPUSDT/XRPUSDT2024-12-01.csv.gz).
+From the repository root, run the comparison with Backtest built from the
+checkout and the pinned Nautilus release. The script verifies both archive hashes.
+
+```bash
+uv run --no-project --python 3.13 --with . --with 'nautilus-trader==2.0.0rc8' \
+  python -I validation/chimera_depth_comparison.py \
+  2024-12-01_XRPUSDT_ob500.data.zip XRPUSDT2024-12-01.csv.gz
+```
+
+The second IOC order in each group depends on the first order's fills and
+the strategy's position. The comparison checks order time, side, size and
+limit, plus each fill's time, price, size and fee. It compares liquidity
+reuse and size-at-match refresh. The carry-consumption scenario is reported
+separately because it uses a different assumption. A difference in fill
+volume between policies includes the effect of their different subsequent
+orders. This replay checks correctness and does not collect performance samples.
+
+The archived book drives marketable executions. The trade archive quantifies
+timestamp ties and cannot recover their causal order. These archives also
+lack the information needed to estimate hidden liquidity or qualify passive
+queue fills.
 
 ## Virtual Environment Setup
 

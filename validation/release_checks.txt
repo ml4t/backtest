@@ -6,6 +6,7 @@ validation/check_documentation_examples.py
 validation/check_documentation_links.py
 validation/check_documentation_identity.py
 validation/check_security.py
+validation/chimera_depth_comparison.py
 validation/build_framework_env.py
 validation/cross_framework_performance.py
 validation/generate_changelog.py

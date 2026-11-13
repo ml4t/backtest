@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.12.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -72,7 +72,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
-    { name = "ml4t-specs", specifier = ">=0.2.0" },
+    { name = "ml4t-specs", specifier = ">=0.2.1" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.3.2" },
@@ -148,14 +148,14 @@ requires-dist = [
 
 [[package]]
 name = "ml4t-specs"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/46/c734e5bcac1f214c83423243023b5d313bccabd25563da4e7d5e6b80f9f4/ml4t_specs-0.2.0.tar.gz", hash = "sha256:e5d5d614f71d14223341f992009d0d0bf14f30a8398c50872d2b3fb80fd33d82", size = 59749, upload-time = "2026-10-17T18:21:32.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/16/0568b5d2d5a71bafdf2fed15515ff8dfb0bae0d8d66b4a49d4e6f7afe871/ml4t_specs-0.2.1.tar.gz", hash = "sha256:2c920ed4c40c2ab75ff91d2992b46287e29d43a221d64a61c46ce3b6ca6afd6d", size = 61003, upload-time = "2026-11-13T13:28:28.347Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/ff/bfc427bb71635f31cb240330aa2b1b486748999f05a5922ee5f58df721fe/ml4t_specs-0.2.0-py3-none-any.whl", hash = "sha256:cfd550d19b469f1b083d6ac3f83b235fe71aee19c28465f2ac2c8620064bae61", size = 36946, upload-time = "2026-10-17T18:21:30.964Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/1f/cb1ec898f15a08730adb0e97d1f3ba6cff79a684c52126de8d62c82dfacb/ml4t_specs-0.2.1-py3-none-any.whl", hash = "sha256:b0a8063a1f89988271b9ff6f09c2618437925d80f184b63c021eecdf5ce31757", size = 38428, upload-time = "2026-11-13T13:28:27.057Z" },
 ]
 
 [[package]]

@@ -1735,3 +1735,22 @@ def test_explicit_opening_bar_path_controls_trailing_result(
     ).run()
 
     assert len(result.fills) == expected_fill_count
+
+
+def test_order_trace_preserves_native_identity_and_account_after_artifact_round_trip(tmp_path):
+    result = Engine(
+        DataFeed(prices_df=prices(bars=2)),
+        InitialTargetStrategy(target_intent()),
+        BacktestConfig(retain_intent_history=True),
+        holdings_sampling="bar",
+    ).run()
+    result.to_parquet(tmp_path)
+    trace = BacktestResult.from_parquet(tmp_path).to_order_trace(currency="USD")
+    (order,) = trace["orders"]
+    (fill,) = trace["fills"]
+    assert order["child_intent_id"] == "initial-portfolio:SPY"
+    assert order["order_id"] == fill["order_id"] == trace["reconciliations"][-1]["order_id"]
+    assert fill["fee_currency"] == "USD"
+    assert fill["received_at"] is None
+    assert trace["account"]["positions"] == {"SPY": fill["quantity"]}
+    assert trace["account"]["cash"] == 100_000 - fill["quantity"] * fill["price"]
