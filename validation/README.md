@@ -248,12 +248,14 @@ limitation of daily or minute bars in NautilusTrader.
 The Chimera comparison replays the first hour of the
 [Bybit XRPUSDT L2 order book](https://quote-saver.bycsi.com/orderbook/linear/XRPUSDT/2024-12-01_XRPUSDT_ob500.data.zip)
 on 2024-12-01. It compares the displayed-depth replay API with the NautilusTrader
-2.0.0rc8 L2 matcher. Install the pinned Nautilus environment above and download
-the matching [trade archive](https://public.bybit.com/trading/XRPUSDT/XRPUSDT2024-12-01.csv.gz).
-The script verifies both archive hashes before using the data.
+2.0.0rc8 L2 matcher. Download both the order book and the matching
+[trade archive](https://public.bybit.com/trading/XRPUSDT/XRPUSDT2024-12-01.csv.gz).
+From the repository root, run the comparison with Backtest built from the
+checkout and the pinned Nautilus release. The script verifies both archive hashes.
 
 ```bash
-.venv-nautilus-v2/bin/python validation/chimera_depth_comparison.py \
+uv run --no-project --python 3.13 --with . --with 'nautilus-trader==2.0.0rc8' \
+  python -I validation/chimera_depth_comparison.py \
   2024-12-01_XRPUSDT_ob500.data.zip XRPUSDT2024-12-01.csv.gz
 ```
 
