@@ -689,6 +689,48 @@
           "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
           "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
         }
+      },
+      {
+        "certified_at": "2026-11-13T13:35:51.693920+00:00",
+        "correctness_evidence_generated_at": "2026-11-13T13:35:49.854474+00:00",
+        "correctness_evidence_sha256": "49c0dcd793a7b628fbcf434d838f4a7d232dc19a58c4d0e19f229ff8890c0d70",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "74c3ccf2c647fa18094a80d5c294c067a0d32b13092ad42696481536675f797b",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "929781e6ce00969d94b6e4a89318e34d6989f5c5a905c00b623369f6da8cedda",
+          "validation/environments/vectorbt_oss/uv.lock": "230dc89d48115785e622cc6149a044a995d313239ca4a52da20f644b9e5da63d",
+          "validation/environments/vectorbt_pro/uv.lock": "ab641a3f62ac66793f942bdf98040a8542570ed6c94a75eb3c1607f3fbddfcc5",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "32484892717199eb7da9421f4de7742814c6e670c1f6e50112e168c6cdc40717",
+          "validation/environments/zipline/uv.lock": "5c8f870ba6b83f792039b2d9a572578c5ed6420a004be4ab7ed53bd437cf2b10"
+        },
+        "dependency_graphs": {
+          "uv.lock": "1c4e76be0eeb77d8dac54a09c8a5a82374fa01c670585126d7c519556a1a0611",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "cbac9c8e792e635343f518003f79fe6abdac343ad0ac1f50ff1843fc8bacd982",
+          "validation/environments/vectorbt_oss/uv.lock": "76ae8d3f76644701eabbec66b4b2fb3e00f32380b9cbbeab4600d0898055348c",
+          "validation/environments/vectorbt_pro/uv.lock": "24140b9890f02448799f00f0ead220514b5283232edfc346870bc0b32431718c",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "8936e2ec99550b05703ab5983bb34bf21004b9a81c659c10758363802c6fd7fe",
+          "validation/environments/zipline/uv.lock": "317cebf58d511e6719d2c89f6d8f012ea6b5367ffe98f04fffea6c68f5ef19a5"
+        },
+        "engine_source_sha256": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+        "measurement_sha256": "2764a504d315ca55a1bc077073c138de959be647816b651a819d4bde21dfb4e1",
+        "ml4t_commit": "3892c47b7bac11920c1f8004237093b5d28f1b75",
+        "performance_impact": "none",
+        "reason": "The timed default bar path is unchanged and the lock changes only Specs 0.2.1. Specs adds an execution fill record and export without changing the calendar, strategy, intent or accounting behavior used by the timed workloads. All 17 frozen comparisons passed with the exact release wheel; all five Backtest artifacts per pair have exactly equal values versus the previous retained runs. Native reference artifacts and original timing samples are retained.",
+        "reviewed_correctness_sha256": "42ff5d709c3ec7a1ff65d5bf47d8467d9ac507c48f35856ba7d31253ca3fea15",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "64a884292709d4af1a1050f6595e3f657b2483bbcc52be3ee8ec55a6d63aa280",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
       }
     ],
     "dependencies": {
