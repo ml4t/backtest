@@ -111,7 +111,7 @@ def test_minimum_dependency_matrix_proves_declared_lower_bounds() -> None:
     ]
     assert len(specs_dependencies) == 1
     assert specs_dependencies[0].url is None
-    assert str(specs_dependencies[0].specifier) == ">=0.2.0"
+    assert str(specs_dependencies[0].specifier) == ">=0.2.1"
 
 
 def test_merge_and_release_builds_depend_on_compatibility_gate() -> None:
