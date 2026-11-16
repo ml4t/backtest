@@ -712,9 +712,8 @@ class ExecutionEngine:
                 and not include_orders_this_bar
             ):
                 continue
-            if order._waits_for_parent:
-                assert order.parent_id is not None
-                parent = broker.get_order(order.parent_id)
+            if order._bracket_parent_index is not None:
+                parent = self.orders.bracket_entry(order)
                 if (
                     parent is None
                     or parent.status is not OrderStatus.FILLED
@@ -774,9 +773,8 @@ class ExecutionEngine:
             }:
                 self.orders.current_bar_ids.discard(order.order_id)
                 continue
-            if order._waits_for_parent:
-                assert order.parent_id is not None
-                parent = self.broker.get_order(order.parent_id)
+            if order._bracket_parent_index is not None:
+                parent = self.orders.bracket_entry(order)
                 if parent is not None and parent.status in {
                     OrderStatus.REJECTED,
                     OrderStatus.CANCELLED,

@@ -51,6 +51,14 @@ class OrderState:
     volume_consumed_by_asset: dict[str, float] = field(default_factory=dict)
     control_counts: dict[tuple[str, date], int] = field(default_factory=dict)
 
+    def bracket_entry(self, child: Order) -> Order | None:
+        # The order journal is append-only except when a transaction rolls back its own tail.
+        index = child._bracket_parent_index
+        if index is None or index >= len(self.orders):
+            return None
+        entry = self.orders[index]
+        return entry if entry.order_id == child.parent_id else None
+
 
 @dataclass(slots=True)
 class RiskState:

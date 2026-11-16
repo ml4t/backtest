@@ -29,7 +29,8 @@ def _feed(opens, highs, lows, closes, *, volumes=None):
 
 @pytest.mark.parametrize("ordering", list(FillOrdering))
 @pytest.mark.parametrize("direction", [1, -1])
-def test_bracket_stop_cannot_trade_on_entry_observation(ordering, direction):
+@pytest.mark.parametrize("immediate_fill", [True, False])
+def test_bracket_stop_cannot_trade_on_entry_observation(ordering, direction, immediate_fill):
     trigger_price = 94.0 if direction == 1 else 106.0
     prices = [trigger_price] * 3
     times, feed = _feed(prices, prices, prices, prices)
@@ -55,6 +56,7 @@ def test_bracket_stop_cannot_trade_on_entry_observation(ordering, direction):
             allow_short_selling=True,
             allow_leverage=True,
             fill_ordering=ordering,
+            immediate_fill=immediate_fill,
             execution_mode=ExecutionMode.SAME_BAR,
         ),
     ).run()

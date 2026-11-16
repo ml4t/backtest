@@ -355,7 +355,8 @@ class FillExecutor:
         if not is_partial:
             order.status = OrderStatus.FILLED
             order.filled_at = current_time
-            order._filled_bar_index = self.market.bar_index
+            if order._has_bracket_exits:
+                order._filled_bar_index = self.market.bar_index
 
         # Build fill context
         ctx = FillContext(
