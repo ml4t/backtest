@@ -76,7 +76,7 @@ The table reports engine-call wall time for all 17 correctness-passing pairs. Th
 
 Backtest measured 2026-10-21; reference measurements dated 2026-10-13 were retained unchanged. Host: `Linux-7.0.0-38-generic-x86_64-with-glibc2.43` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
-A performance-impact review retains these measurements for engine source `28c47d6eb270`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun. Dependency validation checks selected packages and artifacts; allowing prereleases without changing those selections does not invalidate the measurements.
+A performance-impact review retains these measurements for engine source `ac87b9af6dcb`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun. Dependency validation checks selected packages and artifacts; allowing prereleases without changing those selections does not invalidate the measurements.
 
 ### Synthetic diagnostic scenarios
 
@@ -193,6 +193,85 @@ samples, deterministic 95% bootstrap intervals, exact output checksums, immutabl
 identities, and semantic disclosures for an idiomatic view. This controlled synthetic artifact is
 not used for the published real-strategy ratios above.
 
+### NautilusTrader and pysystemtrade
+
+These optional comparisons use synthetic prices and predetermined target quantities. Each side
+must independently match a cent-denominated reference ledger before the runner reports timings.
+
+| Workload | Native reference | What must match |
+|---|---|---|
+| 50 equities × 252 daily bars | [NautilusTrader 2.0.0rc8](https://pypi.org/project/nautilus-trader/2.0.0rc8/) cash-account market orders | Fill time, instrument, signed size, price and fee; final cash and positions |
+| 20 equities × 1,950 one-minute bars | NautilusTrader 2.0.0rc8 with the same order rules | The same fill and account fields |
+| 12 futures × 504 daily marks | [pysystemtrade 1.8.3 source](https://github.com/pst-group/pysystemtrade/tree/bbf5cf823e16be1cca27493a94099eb8cf33f6e7) position-to-fill and cash-cost accounting | Inferred fills, costs and final positions; each daily equity mark against Backtest's variation-cash ledger |
+
+The equity workload sends long-only market orders at each instrument's close, with targets
+known before that close, zero costs, and enough cash to avoid order priority effects. It does
+not measure tick or order book replay. The futures workload applies a $50 point value and a
+$2 per-contract fee. It compares the accounting step after targets are known, without
+forecast generation, contract selection, rolls or broker simulation on the pysystemtrade side.
+Its calculation time is not an engine speed comparison.
+
+From the repository root, create the two Python 3.13 environments and fetch the pinned
+pysystemtrade source. The runner imports its accounting modules from that checkout. This avoids
+installing the separate broker and PDF-reporting dependencies of the full application.
+
+```bash
+uv venv --python 3.13 .venv-nautilus-v2
+uv pip sync --python .venv-nautilus-v2/bin/python validation/environments/nautilus/requirements.txt
+uv venv --python 3.13 .venv-pysystemtrade-accounting
+uv pip sync --python .venv-pysystemtrade-accounting/bin/python validation/environments/pysystemtrade/requirements.txt
+
+git init validation/candidates/pysystemtrade
+git -C validation/candidates/pysystemtrade fetch --depth 1 \
+  https://github.com/pst-group/pysystemtrade.git bbf5cf823e16be1cca27493a94099eb8cf33f6e7
+git -C validation/candidates/pysystemtrade checkout --detach FETCH_HEAD
+
+.venv-nautilus-v2/bin/python validation/reference_workloads.py nautilus-daily
+.venv-nautilus-v2/bin/python validation/reference_workloads.py nautilus-minute
+.venv-pysystemtrade-accounting/bin/python validation/reference_workloads.py pysystemtrade-futures \
+  --pysystemtrade-source validation/candidates/pysystemtrade
+```
+
+Add `--measure --output result.json` to retain the verified ledgers and ten isolated timing
+samples per side. The runner performs one unmeasured pass per side, alternates execution order,
+and reports both the native call interval and complete process time. These workloads are
+separate from the retained release comparison above.
+
+Use this runner for NautilusTrader 2.x. The historical `benchmark_suite.py --framework nautilus`
+route uses the 1.x API. Its synthetic generator can put the open outside the high/low range;
+NautilusTrader 1.221.0 correctly rejects those bars. The adapter also failed when sorting
+multiple instrument bars with equal timestamps in that version. Neither result establishes a
+limitation of daily or minute bars in NautilusTrader.
+
+### Marketable orders against historical depth
+
+The Chimera comparison replays the first hour of the
+[Bybit XRPUSDT L2 order book](https://quote-saver.bycsi.com/orderbook/linear/XRPUSDT/2024-12-01_XRPUSDT_ob500.data.zip)
+on 2024-12-01. It compares the displayed-depth replay API with the NautilusTrader
+2.0.0rc8 L2 matcher. Download both the order book and the matching
+[trade archive](https://public.bybit.com/trading/XRPUSDT/XRPUSDT2024-12-01.csv.gz).
+From the repository root, run the comparison with Backtest built from the
+checkout and the pinned Nautilus release. The script verifies both archive hashes.
+
+```bash
+uv run --no-project --python 3.13 --with . --with 'nautilus-trader==2.0.0rc8' \
+  python -I validation/chimera_depth_comparison.py \
+  2024-12-01_XRPUSDT_ob500.data.zip XRPUSDT2024-12-01.csv.gz
+```
+
+The second IOC order in each group depends on the first order's fills and
+the strategy's position. The comparison checks order time, side, size and
+limit, plus each fill's time, price, size and fee. It compares liquidity
+reuse and size-at-match refresh. The carry-consumption scenario is reported
+separately because it uses a different assumption. A difference in fill
+volume between policies includes the effect of their different subsequent
+orders. This replay checks correctness and does not collect performance samples.
+
+The archived book drives marketable executions. The trade archive quantifies
+timestamp ties and cannot recover their causal order. These archives also
+lack the information needed to estimate hidden liquidity or qualify passive
+queue fills.
+
 ## Virtual Environment Setup
 
 ```bash
@@ -240,9 +319,9 @@ validation/
 ├── REAL_STRATEGY_PERFORMANCE.json    # Retained engine timing evidence
 ├── large_scale_evidence.py    # Reconstructable exact scale matrix
 ├── cross_framework_performance.py  # Repeated controlled and idiomatic evidence
+├── reference_workloads.py     # Optional NautilusTrader and pysystemtrade comparisons
 ├── run_all_benchmarks.py      # Compatibility route to the retained performance runner
 ├── benchmark_suite.py         # Shared framework workload adapters
 ├── lean/                      # LEAN integration
-├── trade_logs/                # Golden file CSVs (gitignored)
-└── nautilus/                  # Nautilus Trader evaluation
+└── trade_logs/                # Golden file CSVs (gitignored)
 ```

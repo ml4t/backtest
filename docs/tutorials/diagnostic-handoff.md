@@ -127,3 +127,13 @@ Diagnostic 0.2.0 adds the complete holdings and activity handoff. Use the
 cohort is published, or the explicitly pinned source route while publication is
 pending. Those newer helpers are absent from the published Diagnostic 0.1.9 wheel.
 Backtest supplies accounts, holdings and fills; Diagnostic owns their analysis.
+
+## Export an individual order trace
+
+Enable `BacktestConfig(retain_intent_history=True)` and pass
+`holdings_sampling="bar"` to `Engine` to retain order links and account
+checkpoints. Use `result.to_order_trace(currency="USD")` to export the
+recorded canonical intents, simulated orders and incremental fills as a
+JSON-compatible dictionary. Supply the currency when the instrument has no
+declared quote currency. Simulation fill IDs are scoped to the result and
+simulated fills have no broker receipt timestamp.
