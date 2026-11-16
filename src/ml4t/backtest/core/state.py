@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Set
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -18,6 +18,7 @@ class MarketState:
     time: datetime | None = None
     prices: dict[str, float] = field(default_factory=dict)
     opens: dict[str, float] = field(default_factory=dict)
+    unobserved_opens: Set[str] | None = None
     highs: dict[str, float] = field(default_factory=dict)
     lows: dict[str, float] = field(default_factory=dict)
     closes: dict[str, float] = field(default_factory=dict)

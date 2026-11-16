@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import logging
 from collections import deque
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Set
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import date, datetime
@@ -3279,6 +3279,7 @@ class Broker:
         highs: dict[str, float] | None = None,
         lows: dict[str, float] | None = None,
         *rest,
+        unobserved_opens: Set[str] | None = None,
         **kwargs,
     ):
         if kwargs:
@@ -3326,6 +3327,7 @@ class Broker:
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens
+        self._market_state.unobserved_opens = unobserved_opens
         self._current_highs = highs
         self._current_lows = lows
         self._current_closes = closes

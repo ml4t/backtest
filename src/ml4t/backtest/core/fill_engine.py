@@ -424,6 +424,9 @@ class FillEngine:
             or order._created_bar_index >= self.market.bar_index
         ):
             return None
+        missing = self.market.unobserved_opens
+        if missing is not None and order.asset in missing:
+            return None
         opening = self.market.opens.get(order.asset)
         if (
             opening is not None

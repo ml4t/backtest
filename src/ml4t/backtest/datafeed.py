@@ -5,6 +5,7 @@ timestamp-to-slice indexes, then converts only the current bar to dicts at
 iteration time.
 """
 
+from collections.abc import Set
 from copy import deepcopy
 from datetime import date, datetime
 from pathlib import Path
@@ -33,6 +34,7 @@ class _AssetsData(dict[str, dict[str, Any]]):
     __slots__ = (
         "_prices",
         "_opens",
+        "_unobserved_opens",
         "_highs",
         "_lows",
         "_closes",
@@ -50,6 +52,7 @@ class _AssetsData(dict[str, dict[str, Any]]):
         super().__init__()
         self._prices: dict[str, float] = {}
         self._opens: dict[str, Any] = {}
+        self._unobserved_opens: Set[str] | None = None
         self._highs: dict[str, Any] = {}
         self._lows: dict[str, Any] = {}
         self._closes: dict[str, Any] = {}
@@ -616,6 +619,7 @@ class DataFeed:
         # Convert price DataFrame slice to dicts (lazy, only current bar)
         price_df = self._slice_for_timestamp(self.prices, self._price_ranges_by_ts, ts)
         if price_df is not None:
+            missing_opens: set[str] | None = None
             for row in temporal_rows(price_df, named=False):
                 asset = row[price_entity_idx]
                 close = row[price_close_idx] if price_close_idx >= 0 else None
@@ -635,6 +639,10 @@ class DataFeed:
                 ask_size = row[price_ask_size_idx] if price_ask_size_idx >= 0 else None
 
                 if open_ is None:
+                    if price_open_idx >= 0:
+                        if missing_opens is None:
+                            missing_opens = set()
+                        missing_opens.add(asset)
                     open_ = close
                 if high is None:
                     high = close
@@ -688,6 +696,10 @@ class DataFeed:
                 if ask_size is not None:
                     assets_data._ask_sizes[asset] = ask_size
                 assets_data._signals[asset] = assets_data[asset]["signals"]
+
+            assets_data._unobserved_opens = (
+                assets_data.keys() if price_open_idx < 0 else missing_opens
+            )
 
         # Add signals for each asset - lazy conversion
         signal_df = self._slice_for_timestamp(self.signals, self._signal_ranges_by_ts, ts)

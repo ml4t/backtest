@@ -72,10 +72,10 @@ def test_resting_limit_uses_only_causal_favorable_open(direction, slippage):
     adverse = limit + direction * 2
     favorable = limit - direction * 2
     times, feed = _feed(
-        [favorable, adverse, favorable],
-        [max(adverse, favorable)] * 3,
-        [min(adverse, favorable)] * 3,
-        [adverse] * 3,
+        [favorable, None, adverse, favorable],
+        [max(adverse, favorable)] * 4,
+        [min(adverse, favorable)] * 4,
+        [adverse, favorable, adverse, adverse],
     )
 
     class RestingLimit(Strategy):
@@ -100,7 +100,7 @@ def test_resting_limit_uses_only_causal_favorable_open(direction, slippage):
         ),
     ).run()
 
-    assert [fill.timestamp for fill in result.fills] == [times[2]]
+    assert [fill.timestamp for fill in result.fills] == [times[3]]
     adjustment = 0.5 if slippage is SlippageType.FIXED else favorable * 0.005
     assert result.fills[0].price == pytest.approx(favorable + direction * adjustment)
     assert result.fills[0].price_source == "open"

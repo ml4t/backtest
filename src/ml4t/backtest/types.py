@@ -222,8 +222,8 @@ class Order:
     _submitted_session_date: date | None = field(default=None, kw_only=True)
     _eligible_from: datetime | None = field(default=None, kw_only=True)
     _eligible_on_boundary: bool = field(default=True, kw_only=True)
-    _waits_for_parent: bool = field(default=False, kw_only=True)
-    _filled_bar_index: int | None = field(default=None, kw_only=True)
+    _waits_for_parent: bool = field(default=False, init=False, repr=False, compare=False)
+    _filled_bar_index: int | None = field(default=None, init=False, repr=False, compare=False)
     _stop_triggered: bool = field(default=False, kw_only=True)
     _stop_triggered_at: datetime | None = field(default=None, kw_only=True)
 
