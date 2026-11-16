@@ -647,6 +647,132 @@
           "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
           "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
         }
+      },
+      {
+        "certified_at": "2026-11-12T23:19:25.871695+00:00",
+        "correctness_evidence_generated_at": "2026-11-12T23:18:40.045640+00:00",
+        "correctness_evidence_sha256": "013afa33176df3ba7a1df6c0fad4bff40560ae73bed1363c231e4626c6672330",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "9ee7120c5bf1a835ad6e193a61f6c934b29b71626371e92b54e1cba854572fbb",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "929781e6ce00969d94b6e4a89318e34d6989f5c5a905c00b623369f6da8cedda",
+          "validation/environments/vectorbt_oss/uv.lock": "230dc89d48115785e622cc6149a044a995d313239ca4a52da20f644b9e5da63d",
+          "validation/environments/vectorbt_pro/uv.lock": "ab641a3f62ac66793f942bdf98040a8542570ed6c94a75eb3c1607f3fbddfcc5",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "32484892717199eb7da9421f4de7742814c6e670c1f6e50112e168c6cdc40717",
+          "validation/environments/zipline/uv.lock": "5c8f870ba6b83f792039b2d9a572578c5ed6420a004be4ab7ed53bd437cf2b10"
+        },
+        "dependency_graphs": {
+          "uv.lock": "a448951668b36d81ae6f7d9d926b11f853cb6d8c9baa36a806d3964d81e9ddf3",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "cbac9c8e792e635343f518003f79fe6abdac343ad0ac1f50ff1843fc8bacd982",
+          "validation/environments/vectorbt_oss/uv.lock": "76ae8d3f76644701eabbec66b4b2fb3e00f32380b9cbbeab4600d0898055348c",
+          "validation/environments/vectorbt_pro/uv.lock": "24140b9890f02448799f00f0ead220514b5283232edfc346870bc0b32431718c",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "8936e2ec99550b05703ab5983bb34bf21004b9a81c659c10758363802c6fd7fe",
+          "validation/environments/zipline/uv.lock": "317cebf58d511e6719d2c89f6d8f012ea6b5367ffe98f04fffea6c68f5ef19a5"
+        },
+        "engine_source_sha256": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+        "measurement_sha256": "2764a504d315ca55a1bc077073c138de959be647816b651a819d4bde21dfb4e1",
+        "ml4t_commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+        "performance_impact": "none",
+        "reason": "The displayed-depth book is an independent opt-in API and is never called in the retained timed bar workloads. The order export is called after a run, and the new retention loop is gated by retain_intent_history, which is disabled in all 17 measured profiles. Fresh candidate and main runs using the same environment produced byte-identical fills, equity and rejected-order outputs for all 17 pairs. Retained native outputs were independently checked against their original measurement hashes. The locked dependencies, timed adapters, timing boundary and original measurements are unchanged.",
+        "reviewed_correctness_sha256": "dfaf2d144e9d609a5a6071a6c432948a2f4fa7a61324ebaf63922aa287632f0d",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "64a884292709d4af1a1050f6595e3f657b2483bbcc52be3ee8ec55a6d63aa280",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-11-13T13:35:51.693920+00:00",
+        "correctness_evidence_generated_at": "2026-11-13T13:35:49.854474+00:00",
+        "correctness_evidence_sha256": "49c0dcd793a7b628fbcf434d838f4a7d232dc19a58c4d0e19f229ff8890c0d70",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "74c3ccf2c647fa18094a80d5c294c067a0d32b13092ad42696481536675f797b",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "929781e6ce00969d94b6e4a89318e34d6989f5c5a905c00b623369f6da8cedda",
+          "validation/environments/vectorbt_oss/uv.lock": "230dc89d48115785e622cc6149a044a995d313239ca4a52da20f644b9e5da63d",
+          "validation/environments/vectorbt_pro/uv.lock": "ab641a3f62ac66793f942bdf98040a8542570ed6c94a75eb3c1607f3fbddfcc5",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "32484892717199eb7da9421f4de7742814c6e670c1f6e50112e168c6cdc40717",
+          "validation/environments/zipline/uv.lock": "5c8f870ba6b83f792039b2d9a572578c5ed6420a004be4ab7ed53bd437cf2b10"
+        },
+        "dependency_graphs": {
+          "uv.lock": "1c4e76be0eeb77d8dac54a09c8a5a82374fa01c670585126d7c519556a1a0611",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "cbac9c8e792e635343f518003f79fe6abdac343ad0ac1f50ff1843fc8bacd982",
+          "validation/environments/vectorbt_oss/uv.lock": "76ae8d3f76644701eabbec66b4b2fb3e00f32380b9cbbeab4600d0898055348c",
+          "validation/environments/vectorbt_pro/uv.lock": "24140b9890f02448799f00f0ead220514b5283232edfc346870bc0b32431718c",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "8936e2ec99550b05703ab5983bb34bf21004b9a81c659c10758363802c6fd7fe",
+          "validation/environments/zipline/uv.lock": "317cebf58d511e6719d2c89f6d8f012ea6b5367ffe98f04fffea6c68f5ef19a5"
+        },
+        "engine_source_sha256": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+        "measurement_sha256": "2764a504d315ca55a1bc077073c138de959be647816b651a819d4bde21dfb4e1",
+        "ml4t_commit": "3892c47b7bac11920c1f8004237093b5d28f1b75",
+        "performance_impact": "none",
+        "reason": "The timed default bar path is unchanged and the lock changes only Specs 0.2.1. Specs adds an execution fill record and export without changing the calendar, strategy, intent or accounting behavior used by the timed workloads. All 17 frozen comparisons passed with the exact release wheel; all five Backtest artifacts per pair have exactly equal values versus the previous retained runs. Native reference artifacts and original timing samples are retained.",
+        "reviewed_correctness_sha256": "42ff5d709c3ec7a1ff65d5bf47d8467d9ac507c48f35856ba7d31253ca3fea15",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "64a884292709d4af1a1050f6595e3f657b2483bbcc52be3ee8ec55a6d63aa280",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-11-13T13:56:16.878183+00:00",
+        "correctness_evidence_generated_at": "2026-11-13T13:35:49.854474+00:00",
+        "correctness_evidence_sha256": "49c0dcd793a7b628fbcf434d838f4a7d232dc19a58c4d0e19f229ff8890c0d70",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "74c3ccf2c647fa18094a80d5c294c067a0d32b13092ad42696481536675f797b",
+          "validation/environments/backtrader/uv.lock": "d67ad4cff0e6691ed3f3fb7e5d051f10f90732fa1a512ba007a36e8c989a1c02",
+          "validation/environments/lean/uv.lock": "aba2d1fb31207e6696b392a5fb964f6a57ca44f338c354be51af59b225d3790b",
+          "validation/environments/vectorbt_oss/uv.lock": "54c076af4d1a5562444b53eee8d570f512d7d540745752be966d23a83c466f68",
+          "validation/environments/vectorbt_pro/uv.lock": "72a5930222be5a341085a9bc3f2d8569cd986635cd6ab40637e55bb3a9e46f5b",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "6e93a24389a0b817e9087fab6d2892aaf9dd5f2e11cdacf3d3a12184424a2ffd",
+          "validation/environments/zipline/uv.lock": "925fa42bdc08f96d3361cb8733d9e6bff05bff7bce471294682074adb5a450a1"
+        },
+        "dependency_graphs": {
+          "uv.lock": "1c4e76be0eeb77d8dac54a09c8a5a82374fa01c670585126d7c519556a1a0611",
+          "validation/environments/backtrader/uv.lock": "85c2437154c481ea1d30b10a72714a1952c7a468fb6008393898c3c0d9ea7a43",
+          "validation/environments/lean/uv.lock": "7f2ea13ebc88811ef66356f15bfce1c5934ee4c43c6091b7712de37dcd837f2f",
+          "validation/environments/vectorbt_oss/uv.lock": "e741ccc456e47c49dba5d20b426fcb8d69ebeb999a876b4ef8e7fb1679de26c6",
+          "validation/environments/vectorbt_pro/uv.lock": "5a340e003daa8ec0060dbcb99a3806e9bba08fbf37dc1a7c32dca145e16c94e0",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "c90fa7740b8ed5fd1ae2a1bc84c9ddb4b2fc080fcf85d0c76265a6b3829d1152",
+          "validation/environments/zipline/uv.lock": "3521651c22c759f8dc89db415fc4c9695c1d87910de153b817432d71b6cc0ff6"
+        },
+        "engine_source_sha256": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+        "measurement_sha256": "2764a504d315ca55a1bc077073c138de959be647816b651a819d4bde21dfb4e1",
+        "ml4t_commit": "3892c47b7bac11920c1f8004237093b5d28f1b75",
+        "performance_impact": "none",
+        "reason": "Refresh the comparison-environment lockfiles for the released additive Specs 0.2.1 order-trace contract. Reference package versions and artifact identities, comparison inputs, adapter code and Backtest bar execution are unchanged. All 17 frozen comparisons pass with the released dependency and all five Backtest tables have identical values per comparison. Previously measured runtimes are retained against their original measurement environment.",
+        "reviewed_correctness_sha256": "42ff5d709c3ec7a1ff65d5bf47d8467d9ac507c48f35856ba7d31253ca3fea15",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "64a884292709d4af1a1050f6595e3f657b2483bbcc52be3ee8ec55a6d63aa280",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
       }
     ],
     "dependencies": {

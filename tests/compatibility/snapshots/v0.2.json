@@ -3684,6 +3684,10 @@
           "kind": "method",
           "signature": "(self) -> 'pl.DataFrame'"
         },
+        "to_order_trace": {
+          "kind": "method",
+          "signature": "(self, *, currency: 'str | None' = None) -> 'dict[str, Any]'"
+        },
         "to_parquet": {
           "kind": "method",
           "signature": "(self, path: 'str | Path', include: 'list[str] | None' = None, compression: \"Literal['lz4', 'uncompressed', 'snappy', 'gzip', 'brotli', 'zstd']\" = 'zstd') -> 'dict[str, Path]'"
@@ -4505,6 +4509,10 @@
         "to_holdings_dataframe": {
           "kind": "method",
           "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_order_trace": {
+          "kind": "method",
+          "signature": "(self, *, currency: 'str | None' = None) -> 'dict[str, Any]'"
         },
         "to_parquet": {
           "kind": "method",

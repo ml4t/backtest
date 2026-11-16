@@ -330,10 +330,9 @@ and explicit null; do not relabel an old payload without deciding what its null 
 Direct result calls use the current selector contract: `result.to_daily_returns(calendar=None)`
 returns observations even when the result was built from a legacy configuration.
 
-Calendar v2 requires `ml4t-specs>=0.2.0`. The published
-[Specs 0.2.0](https://pypi.org/project/ml4t-specs/0.2.0/) package contains the versioned
-selector and serialization API. This is next-version Backtest behavior; the pending
-0.1.13 release candidate remains unchanged.
+Backtest uses the versioned calendar selector and serialization API introduced in Specs 0.2.0.
+This version of Backtest requires [Specs 0.2.1](https://pypi.org/project/ml4t-specs/0.2.1/)
+or later for the shared execution fill contract.
 
 ### Feed Contract
 
