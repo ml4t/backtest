@@ -2503,11 +2503,15 @@ class Broker:
         if tp is None:
             return None
         tp.parent_id = entry.order_id
+        tp._waits_for_parent = True
 
         sl = self.submit_order(asset, exit_qty, exit_side, OrderType.STOP, stop_price=stop_loss)
         if sl is None:
             return None
         sl.parent_id = entry.order_id
+        sl._waits_for_parent = True
+        if entry.status is OrderStatus.REJECTED:
+            self._order_book.cancel_bracket_exits(entry.order_id, reason="bracket_entry_rejected")
 
         return entry, tp, sl
 
