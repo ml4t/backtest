@@ -63,7 +63,7 @@
       "version": "3.1.1"
     }
   },
-  "generated_at": "2026-11-12T23:07:32.367943+00:00",
+  "generated_at": "2026-11-16T22:01:22.080986+00:00",
   "input_policy": {
     "float_quantum": "0.00000001",
     "rounding": "ROUND_HALF_EVEN",
@@ -704,7 +704,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 10.503785482986132,
+      "duration_seconds": 7.047014399955515,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -1361,7 +1361,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -1374,12 +1374,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -2034,7 +2034,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 6.991331750992686,
+      "duration_seconds": 6.620558513968717,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -2691,7 +2691,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -2704,12 +2704,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -2861,7 +2861,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 6.382342819997575,
+      "duration_seconds": 7.677079565997701,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3009,7 +3009,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
@@ -3022,12 +3022,12 @@
         },
         "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 20,
@@ -3179,7 +3179,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 6.45095600100467,
+      "duration_seconds": 7.152614029997494,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3327,7 +3327,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
@@ -3340,12 +3340,12 @@
         },
         "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 20,
@@ -4010,7 +4010,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 6.96249083901057,
+      "duration_seconds": 8.165022910980042,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -4671,7 +4671,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -4684,12 +4684,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -5354,7 +5354,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 7.520904379998683,
+      "duration_seconds": 8.396656813973095,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -6015,7 +6015,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -6028,12 +6028,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -6688,7 +6688,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 7.426728211008594,
+      "duration_seconds": 6.675442709005438,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -7345,7 +7345,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -7358,12 +7358,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -8018,7 +8018,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 6.8204908649931895,
+      "duration_seconds": 6.8101872150436975,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -8675,7 +8675,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -8688,12 +8688,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -8892,7 +8892,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 6.312781004991848,
+      "duration_seconds": 6.477434639993589,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9093,7 +9093,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
@@ -9106,12 +9106,12 @@
         },
         "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -9367,7 +9367,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 4.943849952003802,
+      "duration_seconds": 6.836700604006182,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9625,7 +9625,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "27979784dbb2f9dd6cf72c0d89ea956d49003ed83a57ed254cb6a2cbd234b6a5",
@@ -9638,12 +9638,12 @@
         },
         "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -10298,7 +10298,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 6.111762914995779,
+      "duration_seconds": 7.086373163969256,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -10955,7 +10955,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -10968,12 +10968,12 @@
         },
         "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 200,
@@ -11172,7 +11172,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 6.033663206995698,
+      "duration_seconds": 5.962742523988709,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11373,7 +11373,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "15f4500f48791f0c67d7c57f2554d0689a35a6dd71e07a8117de510acf106770",
@@ -11386,12 +11386,12 @@
         },
         "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -11533,7 +11533,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 8.094978822002304,
+      "duration_seconds": 6.245035508007277,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11677,7 +11677,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
@@ -11690,12 +11690,12 @@
         },
         "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -11837,7 +11837,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 7.322896611003671,
+      "duration_seconds": 6.5473061359953135,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11981,7 +11981,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
@@ -11994,12 +11994,12 @@
         },
         "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -12141,7 +12141,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 7.050700539999525,
+      "duration_seconds": 7.182985742983874,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -12285,7 +12285,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
@@ -12298,12 +12298,12 @@
         },
         "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -12901,7 +12901,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 7.294182699013618,
+      "duration_seconds": 6.136096254980657,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -13501,7 +13501,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
@@ -13514,12 +13514,12 @@
         },
         "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1500,
@@ -47804,7 +47804,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 7.288371576010832,
+      "duration_seconds": 6.308359592978377,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -82091,7 +82091,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -82104,12 +82104,12 @@
         },
         "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1800,
@@ -82764,7 +82764,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 9.61306252599752,
+      "duration_seconds": 9.928760892013088,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -83421,7 +83421,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -83434,12 +83434,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -84094,7 +84094,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 8.028206959003,
+      "duration_seconds": 9.765202787995804,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -84751,7 +84751,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -84764,12 +84764,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -84921,7 +84921,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 9.394568313990021,
+      "duration_seconds": 9.164660621026997,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85069,7 +85069,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
@@ -85082,12 +85082,12 @@
         },
         "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 20,
@@ -85239,7 +85239,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 8.636366760008968,
+      "duration_seconds": 7.881236907967832,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85387,7 +85387,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
@@ -85400,12 +85400,12 @@
         },
         "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 20,
@@ -86070,7 +86070,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 11.010554658001638,
+      "duration_seconds": 8.929264125006739,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -86731,7 +86731,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -86744,12 +86744,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -86774,7 +86774,7 @@
     {
       "comparison": null,
       "detail": "Scenario explicitly excludes this framework",
-      "duration_seconds": 1.5032012015581131e-05,
+      "duration_seconds": 8.556991815567017e-06,
       "framework": "vectorbt_oss",
       "framework_result": null,
       "ml4t_result": null,
@@ -87418,7 +87418,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 10.27143625500321,
+      "duration_seconds": 9.692460363963619,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -88075,7 +88075,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -88088,12 +88088,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -88748,7 +88748,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 9.77768520799873,
+      "duration_seconds": 9.595551894977689,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89405,7 +89405,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -89418,12 +89418,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -89622,7 +89622,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 9.783436241006711,
+      "duration_seconds": 8.881190088985022,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89823,7 +89823,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
@@ -89836,12 +89836,12 @@
         },
         "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -90097,7 +90097,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 9.283463694999227,
+      "duration_seconds": 7.745053354010452,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -90355,7 +90355,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "27979784dbb2f9dd6cf72c0d89ea956d49003ed83a57ed254cb6a2cbd234b6a5",
@@ -90368,12 +90368,12 @@
         },
         "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -91028,7 +91028,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 9.821508014007122,
+      "duration_seconds": 8.989273482002318,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -91685,7 +91685,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -91698,12 +91698,12 @@
         },
         "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 200,
@@ -91902,7 +91902,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 7.9375491730024805,
+      "duration_seconds": 7.861371537961531,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92103,7 +92103,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "85ef0c7c62fc2cf1f841196fce585253cbfa5fe4d3beb0e6c204003994d7f28f",
@@ -92116,12 +92116,12 @@
         },
         "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "66c558e76264b7d1bd21e22c86082bfe922a6832",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -92263,7 +92263,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 9.846476684993831,
+      "duration_seconds": 8.786340521008242,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92407,7 +92407,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
@@ -92420,12 +92420,12 @@
         },
         "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -92567,7 +92567,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 8.841395901996293,
+      "duration_seconds": 9.711418038990814,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92711,7 +92711,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
@@ -92724,12 +92724,12 @@
         },
         "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -92871,7 +92871,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 9.077247754001291,
+      "duration_seconds": 8.104136720998213,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -93015,7 +93015,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
@@ -93028,12 +93028,12 @@
         },
         "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -93631,7 +93631,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 7.910743476997595,
+      "duration_seconds": 7.988958799978718,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -94231,7 +94231,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
@@ -94244,12 +94244,12 @@
         },
         "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1500,
@@ -128534,7 +128534,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 7.154977606012835,
+      "duration_seconds": 9.592299862997606,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -162821,7 +162821,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -162834,12 +162834,12 @@
         },
         "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1800,
@@ -163514,7 +163514,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 0.8153168779972475,
+      "duration_seconds": 0.5449769439874217,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -164193,7 +164193,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -164206,12 +164206,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -164886,7 +164886,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 0.7423212549911113,
+      "duration_seconds": 0.6252346020191908,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165565,7 +165565,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -165578,12 +165578,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -165736,7 +165736,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 0.7379915380006423,
+      "duration_seconds": 0.6293515659635887,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165885,7 +165885,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -165898,12 +165898,12 @@
         },
         "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 20,
@@ -166056,7 +166056,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 0.7922601489990484,
+      "duration_seconds": 0.6832715250202455,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -166205,7 +166205,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -166218,12 +166218,12 @@
         },
         "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 20,
@@ -166908,7 +166908,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 0.8479205230105435,
+      "duration_seconds": 0.7113541080034338,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -167589,7 +167589,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -167602,12 +167602,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -168292,7 +168292,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 0.6403043419995811,
+      "duration_seconds": 0.7785888939979486,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -168973,7 +168973,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -168986,12 +168986,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -169666,7 +169666,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 0.6547068069921806,
+      "duration_seconds": 0.7634903010330163,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -170345,7 +170345,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -170358,12 +170358,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -171038,7 +171038,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 0.7516977619961835,
+      "duration_seconds": 0.6006182900164276,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -171717,7 +171717,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -171730,12 +171730,12 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -171936,7 +171936,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 0.8734461669955635,
+      "duration_seconds": 0.7893216180382296,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172139,7 +172139,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -172152,12 +172152,12 @@
         },
         "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -172416,7 +172416,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 0.8152304789982736,
+      "duration_seconds": 0.539088701014407,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172677,7 +172677,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -172690,12 +172690,12 @@
         },
         "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -173360,7 +173360,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 0.663418208991061,
+      "duration_seconds": 0.746207243995741,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174027,7 +174027,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -174040,12 +174040,12 @@
         },
         "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 200,
@@ -174246,7 +174246,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 0.7387977260077605,
+      "duration_seconds": 0.6781965059926733,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174449,7 +174449,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "573f73f81275679129b0b0cda5fdf37aa7c8dadf009a5f5aca55fb7be9f9985e",
@@ -174462,12 +174462,12 @@
         },
         "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 100,
@@ -174610,7 +174610,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 0.6136919230048079,
+      "duration_seconds": 0.7702706039999612,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174755,7 +174755,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -174768,12 +174768,12 @@
         },
         "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -174916,7 +174916,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 1.0046079820021987,
+      "duration_seconds": 0.7378556650364771,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175061,7 +175061,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -175074,12 +175074,12 @@
         },
         "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -175222,7 +175222,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 0.9701500580122229,
+      "duration_seconds": 0.7894200650043786,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175367,7 +175367,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -175380,12 +175380,12 @@
         },
         "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 50,
@@ -175992,7 +175992,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 1.156954530000803,
+      "duration_seconds": 1.2174706269870512,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -176601,7 +176601,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
@@ -176614,12 +176614,12 @@
         },
         "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1500,
@@ -212104,7 +212104,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 1.943595580989495,
+      "duration_seconds": 1.6273142489953898,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -247593,7 +247593,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -247606,12 +247606,12 @@
         },
         "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1800,
@@ -247981,7 +247981,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 6.728130564006278,
+      "duration_seconds": 5.012462813989259,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -248357,7 +248357,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -248370,12 +248370,12 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -248745,7 +248745,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 5.425845926991315,
+      "duration_seconds": 3.871680188982282,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249121,7 +249121,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -249134,12 +249134,12 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -249291,7 +249291,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 5.761017559008906,
+      "duration_seconds": 3.880915818968788,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249443,7 +249443,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "16de00f1f72fcdd0199f55a77aaf5fe9c2e99450ae25a5350bd854eebf3896f5",
@@ -249456,12 +249456,12 @@
         },
         "input_digest": "2ade3aa0a65bc5315f2297bc8bbc19b45dfdb8db50e52d56fc85ecb4a82facdd",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 13,
@@ -249613,7 +249613,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 5.29830426099943,
+      "duration_seconds": 4.07251108699711,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249765,7 +249765,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "16de00f1f72fcdd0199f55a77aaf5fe9c2e99450ae25a5350bd854eebf3896f5",
@@ -249778,12 +249778,12 @@
         },
         "input_digest": "f576ca0b7380cdcf6eb6c99d5b8467e796d9811d6fb1cd66191df1688a948b62",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 13,
@@ -250163,7 +250163,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 6.104801694993512,
+      "duration_seconds": 4.533314344997052,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -250543,7 +250543,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -250556,12 +250556,12 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -250941,7 +250941,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 6.403384596007527,
+      "duration_seconds": 3.6374954920029268,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -251321,7 +251321,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -251334,12 +251334,12 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -251709,7 +251709,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 7.260848297999473,
+      "duration_seconds": 4.312226019974332,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252085,7 +252085,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -252098,12 +252098,12 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -252473,7 +252473,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 6.9207741580030415,
+      "duration_seconds": 3.2098140150192194,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252849,7 +252849,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -252862,12 +252862,12 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -253066,7 +253066,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 6.535083299007965,
+      "duration_seconds": 5.058797943987884,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -253271,7 +253271,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
@@ -253284,12 +253284,12 @@
         },
         "input_digest": "52803556b6f294e3ad1223585e297f6dab81add8ca8cf22db7ed227dc14fe627",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -253314,7 +253314,7 @@
     {
       "comparison": null,
       "detail": "Scenario explicitly excludes this framework",
-      "duration_seconds": 1.6192003386095166e-05,
+      "duration_seconds": 7.4750278145074844e-06,
       "framework": "zipline",
       "framework_result": null,
       "ml4t_result": null,
@@ -253673,7 +253673,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 6.840038990994799,
+      "duration_seconds": 3.740710556972772,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254049,7 +254049,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
@@ -254062,12 +254062,12 @@
         },
         "input_digest": "8a8791a9d96df21d21b4fa14ebf111ea1417ec8424fd87ac9b4b79515ca6c952",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 137,
@@ -254266,7 +254266,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 6.605525455001043,
+      "duration_seconds": 4.755023978999816,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254471,7 +254471,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "1d86423ea9c4ce2c32fc3b60b01566b4a0fe7f5629ee4cf2bf6899fd4d728f69",
@@ -254484,12 +254484,12 @@
         },
         "input_digest": "ad5a0b9abf3e7e3ae35e06811443d816a29ac95b66e0bc7ce6b49a175f1e5fce",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 69,
@@ -254631,7 +254631,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 5.702527129004011,
+      "duration_seconds": 4.022492927964777,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254779,7 +254779,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
@@ -254792,12 +254792,12 @@
         },
         "input_digest": "bc94952cbe0b0c493e4a5599ddcd00a92412a9c8c838ea8e5c02d84d217baf0c",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 34,
@@ -254939,7 +254939,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 6.622283497010358,
+      "duration_seconds": 2.755955640983302,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255087,7 +255087,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
@@ -255100,12 +255100,12 @@
         },
         "input_digest": "a0bd681ff924f45192415219403b02e639df271a2aa5987bb9b1e263b2d8c88a",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 34,
@@ -255247,7 +255247,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 4.775645412999438,
+      "duration_seconds": 3.820805669995025,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255395,7 +255395,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
@@ -255408,12 +255408,12 @@
         },
         "input_digest": "ce9cac417809758597595322703b30800145707fa0db44bd7f2cd0775790c114",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 34,
@@ -255783,7 +255783,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 5.923472800001036,
+      "duration_seconds": 4.855125021014828,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -256159,7 +256159,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
@@ -256172,12 +256172,12 @@
         },
         "input_digest": "88cfc732983d3fa783e181fd4c97f8d95f7833e20dd03de0c201aaa85e83ca8b",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1034,
@@ -275471,7 +275471,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 5.325424203998409,
+      "duration_seconds": 4.711868476995733,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -294771,7 +294771,7 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ac87b9af6dcbf1611c6828d8145c43ac0ab393f845a8f6b91806d9364c833f9f",
+          "engine": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
@@ -294784,12 +294784,12 @@
         },
         "input_digest": "6fdd33a401576a2adde590f2f8d5986f5893e4663336033ba6c0f8f221d5d526",
         "ml4t": {
-          "commit": "09de6675367cf2a5122616b165747a68a6cb6c57",
+          "commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
           "dirty": false
         },
         "python": {
           "implementation": "cpython",
-          "version": "3.12.11"
+          "version": "3.12.16"
         },
         "record_counts": {
           "bars": 1241,
