@@ -298,3 +298,35 @@ def test_negative_fee_parameters_are_rejected():
 def test_kalshi_order_fees_takes_one_order_as_one_dimension():
     with pytest.raises(ValueError, match="1-D"):
         kalshi_order_fees([[0.5, 0.5]], [[1, 1]])
+
+
+def test_polymarket_us_published_taker_tiers_feed_both_research_and_engine():
+    from ml4t.backtest import prediction_market_fees as fees
+
+    volumes = [0, 9999.99, 10000, 49999.99, 50000, 249999.99, 250000]
+    coefficients = fees.polymarket_us_taker_coefficient(volumes)
+    assert fees.polymarket_us_fee(
+        0.50, 100, fee_coefficient=coefficients, rounding="cent"
+    ).tolist() == [
+        2.38,
+        2.38,
+        2.12,
+        2.12,
+        1.88,
+        1.88,
+        1.74,
+    ]
+    # A researcher can use an explicitly assigned account tier in the engine.
+    model = PolymarketUSCommission(
+        fee_coefficient=fees.polymarket_us_taker_coefficient(10000).item(), rounding="cent"
+    )
+    assert model.calculate("EXAMPLE", 100, 0.50) == 2.12
+    assert PolymarketUSCommission(rounding="cent").calculate("EXAMPLE", 100, 0.50) == 1.74
+
+
+@pytest.mark.parametrize("volume", [-0.01, float("inf"), float("nan")])
+def test_polymarket_us_tier_lookup_requires_valid_qualifying_volume(volume):
+    from ml4t.backtest import prediction_market_fees as fees
+
+    with pytest.raises(ValueError, match="qualifying_taker_volume"):
+        fees.polymarket_us_taker_coefficient(volume)

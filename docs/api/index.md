@@ -194,6 +194,7 @@ headroom and whole-share rounding.
         - kalshi_order_fees
         - forecastex_fee
         - polymarket_us_fee
+        - polymarket_us_taker_coefficient
         - KalshiCommission
         - ForecastExCommission
         - PolymarketUSCommission
