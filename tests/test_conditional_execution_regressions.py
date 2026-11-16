@@ -7,9 +7,10 @@ import pytest
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, OrderStatus, OrderType, Strategy
 from ml4t.backtest.config import ExecutionMode, FillOrdering, SlippageType
+from ml4t.backtest.execution import VolumeParticipationLimit
 
 
-def _feed(opens, highs, lows, closes):
+def _feed(opens, highs, lows, closes, *, volumes=None):
     times = [datetime(2025, 1, 6, 15, tzinfo=UTC) + timedelta(minutes=i) for i in range(len(opens))]
     return times, DataFeed(
         prices_df=pl.DataFrame(
@@ -20,6 +21,7 @@ def _feed(opens, highs, lows, closes):
                 "high": highs,
                 "low": lows,
                 "close": closes,
+                **({"volume": volumes} if volumes is not None else {}),
             }
         )
     )
@@ -145,3 +147,52 @@ def test_unfilled_bracket_entry_never_exposes_its_take_profit(cancel_parent):
             "bracket_entry_cancelled",
             "bracket_entry_cancelled",
         ]
+
+
+def test_bracket_exits_wait_for_final_partial_entry_fill():
+    prices = [94.0] * 4
+    times, feed = _feed(prices, prices, prices, prices, volumes=[10, 10, 20, 20])
+
+    class Bracket(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                self.orders = broker.submit_bracket(
+                    "TEST", 10, take_profit=110.0, stop_loss=95.0, validate_prices=False
+                )
+
+    strategy = Bracket()
+    result = Engine(
+        feed,
+        strategy,
+        BacktestConfig(calendar=None, initial_cash=10_000, execution_mode=ExecutionMode.SAME_BAR),
+        execution_limits=VolumeParticipationLimit(max_participation=0.5),
+    ).run()
+    entry, profit, stop = strategy.orders
+    assert [(fill.order_id, fill.timestamp, fill.quantity) for fill in result.fills] == [
+        (entry.order_id, times[0], 5.0),
+        (entry.order_id, times[1], 5.0),
+        (stop.order_id, times[2], 10.0),
+    ]
+    assert profit.status is OrderStatus.CANCELLED
+
+
+def test_rejected_bracket_entry_cancels_children_instead_of_leaving_orphans():
+    prices = [100.0, 100.0, 115.0]
+    times, feed = _feed(prices, prices, prices, prices)
+
+    class Bracket(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                self.orders = broker.submit_bracket("TEST", 10, take_profit=110.0, stop_loss=95.0)
+
+    strategy = Bracket()
+    result = Engine(
+        feed,
+        strategy,
+        BacktestConfig(calendar=None, initial_cash=100, execution_mode=ExecutionMode.NEXT_BAR),
+    ).run()
+    entry, *children = strategy.orders
+    assert not result.fills
+    assert entry.status is OrderStatus.REJECTED
+    assert [child.status for child in children] == [OrderStatus.CANCELLED] * 2
+    assert [child.cancellation_reason for child in children] == ["bracket_entry_rejected"] * 2
