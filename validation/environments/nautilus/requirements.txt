@@ -1,0 +1,15 @@
+exchange-calendars==4.13.2
+korean-lunar-calendar==0.4.0
+ml4t-backtest==0.2.0
+ml4t-specs==0.2.0
+nautilus-trader==2.0.0rc8
+numpy==2.5.4
+pandas==3.1.1
+pandas-market-calendars==5.6.0
+polars==2.1.0
+polars-runtime-32==2.1.0
+pyluach==2.3.0
+python-dateutil==4.0.0
+pyyaml==6.0.3
+toolz==1.2.0
+tzdata==2026.6
