@@ -76,7 +76,7 @@ The table reports engine-call wall time for all 17 correctness-passing pairs. Th
 
 Backtest measured 2026-10-21; reference measurements dated 2026-10-13 were retained unchanged. Host: `Linux-7.0.0-38-generic-x86_64-with-glibc2.43` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
-A performance-impact review retains these measurements for engine source `f1f6c2f8aaa3`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun. Dependency validation checks selected packages and artifacts; allowing prereleases without changing those selections does not invalidate the measurements.
+A performance-impact review retains these measurements for engine source `2eaf795159f2`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun. Dependency validation checks selected packages and artifacts; allowing prereleases without changing those selections does not invalidate the measurements.
 
 ### Synthetic diagnostic scenarios
 
@@ -242,6 +242,51 @@ route uses the 1.x API. Its synthetic generator can put the open outside the hig
 NautilusTrader 1.221.0 correctly rejects those bars. The adapter also failed when sorting
 multiple instrument bars with equal timestamps in that version. Neither result establishes a
 limitation of daily or minute bars in NautilusTrader.
+
+### Native strategies on historical data
+
+`real_reference_workloads.py` uses the same pinned environments as the small native workloads.
+For ETF, FX and perpetual cases, use the matching frozen directory from the
+[real-strategy evidence](REAL_STRATEGY_RESULTS.json). The runner verifies the bundle and
+its file hashes before projecting the market data. These cases use different decision rules
+from the retained book strategies; they do not change the existing performance tables.
+
+```bash
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py etfs PATH/TO/ETF_BUNDLE
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py fx_pairs PATH/TO/FX_BUNDLE
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py crypto_perps_funding PATH/TO/PERP_BUNDLE
+.venv-pysystemtrade-accounting/bin/python validation/real_reference_workloads.py \
+  pysystemtrade-trend validation/candidates/pysystemtrade
+.venv-nautilus-v2/bin/python validation/real_reference_workloads.py \
+  nautilus-dated-futures validation/candidates/pysystemtrade
+```
+
+| Case | Same inputs and decisions | What the runner checks |
+| --- | --- | --- |
+| ETF and USD-quoted FX | Four symbols in each case. Historical closes become zero-spread quote observations. A 10/50 EMA crossover submits a fixed unit market order at the observable quote. The EMAs start from the average of the first full window. | Backtest, Nautilus Python, Nautilus Python with registered Rust indicators, and the bundled Nautilus Rust strategy must all match the independently computed fill timestamps, sides, sizes, prices, fees and final positions. |
+| BTC and ETH perpetual funding | Hold one long BTC and one short ETH position. Use the recorded eight-hour funding rates and historical opens as shared mark proxies. Both positions open after the first funding event. | Fill and funding timestamps, amounts and final holdings. The payment tolerance is one unit of Nautilus USDT precision (10⁻⁸ USDT); each side must reconcile the observed payments with its account balance. This tests the funding ledger, not venue mark quality or liquidation. |
+| Dated futures trend | Use the pinned upstream SP500 and GOLD sample data. The native pysystemtrade 16/64 EWMAC rule and a Polars implementation compute forecasts on the adjusted price series. Prior-session forecasts set positions; a fixed March 1, 2022 roll trades each leg at its own raw contract price. | Forecast values, fills inferred by pysystemtrade versus fills executed by Backtest, per-contract fees, daily equity, and Backtest's paired roll outcomes. This uses the forecast and accounting modules, not the full production order system. |
+| Nautilus dated futures | The same raw prices, fixed roll, contract sizes and fees. Nautilus submits market orders on both dated contracts and marks the account after both legs. | Fills, final holdings and daily marked equity. Nautilus retains unrealized P&L on open positions; Backtest realizes it into variation cash at each mark. The report retains both cash series without requiring them to match. |
+
+Add `--measure --output result.json` to run ten fresh processes per side after correctness
+passes. The report retains each sample, both wall and process CPU time for the run, and complete
+process wall time. In the ETF, FX and funding cases the run timer starts after data and strategy
+registration. In the futures case the run includes the forecast, position construction and
+accounting or execution. Compare only the scopes that perform the same work. The futures report
+also gives a separate forecast and target construction interval.
+
+The Nautilus Rust example uses the same simulated venue and native instruments as the two
+Nautilus Python versions. The Python strategy callback still receives each quote when it uses
+the Rust indicator. Nautilus describes
+[`add_builtin_strategy`](https://github.com/nautechsystems/nautilus_trader/blob/d53849b216e20f2c122ca01b4dd0da377638b186/crates/backtest/src/python/engine.rs)
+as a way to share bundled examples, not a general loader for a user's custom native strategy.
+A custom all-Rust strategy implements the
+[Rust strategy callbacks](https://nautilustrader.io/docs/latest/concepts/strategies/).
+
+These runs do not compare bid/ask spread, order book depth, resting-order queue priority,
+latency, currency conversion, continuous futures construction, exchange
+settlement or delivery, or pysystemtrade's full portfolio sizing and buffering. The ETF and FX source
+timestamps are used as replay labels; the projected quotes are not historical order book data.
 
 ### Marketable orders against historical depth
 

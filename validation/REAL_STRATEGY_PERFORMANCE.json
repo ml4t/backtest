@@ -775,9 +775,9 @@
         }
       },
       {
-        "certified_at": "2026-11-16T22:01:23.890563+00:00",
-        "correctness_evidence_generated_at": "2026-11-16T22:01:00.536714+00:00",
-        "correctness_evidence_sha256": "fb73863b3514313e717c39e6bc1d09e9f2fa956d765830a488b7d3f8cf07181e",
+        "certified_at": "2026-11-16T21:49:20.264901+00:00",
+        "correctness_evidence_generated_at": "2026-11-16T21:49:00.688429+00:00",
+        "correctness_evidence_sha256": "9e781a963fc863037710bf18e9692da60c6dac8d6a1a7f4c86e20b217dcd04f0",
         "correctness_pairs_passed": 17,
         "dependencies": {
           "uv.lock": "74c3ccf2c647fa18094a80d5c294c067a0d32b13092ad42696481536675f797b",
@@ -797,12 +797,12 @@
           "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "c90fa7740b8ed5fd1ae2a1bc84c9ddb4b2fc080fcf85d0c76265a6b3829d1152",
           "validation/environments/zipline/uv.lock": "3521651c22c759f8dc89db415fc4c9695c1d87910de153b817432d71b6cc0ff6"
         },
-        "engine_source_sha256": "f1f6c2f8aaa347dd93fdb0bcb706902d2f191faec77d5b1aa9417fe760b5ecb4",
+        "engine_source_sha256": "2eaf795159f293502ecc8d4adf6d516db80f32e30aa7170e938b94c48f4355da",
         "measurement_sha256": "2764a504d315ca55a1bc077073c138de959be647816b651a819d4bde21dfb4e1",
-        "ml4t_commit": "0aa4aad71ea85aa1e6a5653727ef0644d1d6e6cb",
+        "ml4t_commit": "e2031e854d601a5a6996170d95f5c20c0164bbe3",
         "performance_impact": "none",
-        "reason": "The added Polymarket US account-tier function is opt-in and none of the timed strategies calls it or uses a Polymarket commission model. Existing default fee calculations and shared engine code, timed runners, inputs and dependencies are unchanged. All 17 historical ledger comparisons passed.",
-        "reviewed_correctness_sha256": "3a905f3ef9a1488cefd5cb06eb6e9f9ddb388665185029c3fef9141f35e7fa6d",
+        "reason": "Across all 17 frozen workloads, no submitted target row has an explicit zero weight; explicitly omitted assets continue through the unchanged close-position path. The nonzero target order path adds only a single scalar comparison per submission or preview. Broker, feed, runners, inputs and locked dependencies are unchanged. All current historical ledger comparisons passed across the five workload families. The existing measured timing samples and setup are retained unchanged.",
+        "reviewed_correctness_sha256": "c4541810ea949b72ee9bac17c011d3bd62403936c775b0ecced949322b15f74d",
         "sources": {
           "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
           "benchmark": "64a884292709d4af1a1050f6595e3f657b2483bbcc52be3ee8ec55a6d63aa280",
