@@ -430,7 +430,10 @@ class TargetWeightExecutor:
 
         # Compute shares (account for contract multiplier for futures)
         multiplier = broker.get_multiplier(asset)
-        shares = self._quantize_shares(delta_value / (price * multiplier), broker)
+        shares = delta_value / (price * multiplier)
+        if target_wt == 0:
+            shares = self._zero_target_shares(asset, shares, broker)
+        shares = self._quantize_shares(shares, broker)
 
         if shares == 0:
             return None
@@ -442,6 +445,17 @@ class TargetWeightExecutor:
             priority_notional=abs(delta_value),
         )
         return broker.submit_order(asset, abs(shares), side, _options=options)
+
+    def _zero_target_shares(self, asset: str, shares: float, broker: Broker) -> float:
+        if (
+            self.config.account_for_pending
+            and not self.config.cancel_before_rebalance
+            and broker.get_pending_orders(asset)
+        ):
+            return shares
+        position = broker.get_position(asset)
+        # Converting held shares to a weight and back can overshoot the position.
+        return -position.quantity if position is not None else 0.0
 
     def _get_rebalance_price(self, asset: str, data: dict[str, dict]) -> float | None:
         """Return the current bar close used for new rebalance trades."""
@@ -595,6 +609,8 @@ class TargetWeightExecutor:
                 multiplier = broker.get_multiplier(asset)
                 delta_value = equity * weight_delta
                 shares = delta_value / (price * multiplier)
+                if target_wt == 0:
+                    shares = self._zero_target_shares(asset, shares, broker)
 
                 quantized_shares = self._quantize_shares(shares, broker)
 
