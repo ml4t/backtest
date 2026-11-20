@@ -62,7 +62,7 @@ def _target_path(site: Path, path: str) -> Path:
 
 
 def _check_external(url: str) -> str | None:
-    for attempt in range(3):
+    for attempt in range(4):
         try:
             request = Request(url, headers={"User-Agent": _USER_AGENT})
             with urlopen(request, timeout=15) as response:
@@ -72,9 +72,9 @@ def _check_external(url: str) -> str | None:
         except (HTTPError, URLError, TimeoutError) as error:
             if isinstance(error, HTTPError):
                 error.close()
-            if attempt == 2 or (isinstance(error, HTTPError) and error.code < 500):
+            if attempt == 3 or (isinstance(error, HTTPError) and error.code < 500):
                 return str(error)
-            time.sleep(attempt + 1)
+            time.sleep(5 * 2**attempt)
     return "unreachable"
 
 

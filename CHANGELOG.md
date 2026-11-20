@@ -35,6 +35,8 @@
   Require PyArrow 26.0.1 or later in the pinned installed successor qualification cohort.
 - Correct the executable limit-order tutorial to match favorable opening fills and simplify
   documentation navigation. Keep public examples qualified against the built wheel.
+- Retry transient external documentation-link failures with bounded backoff. Broken links and
+  persistent service errors still fail qualification.
 
 ## 0.2.0 - 2026-10-22
 
