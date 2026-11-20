@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Set
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -18,6 +18,7 @@ class MarketState:
     time: datetime | None = None
     prices: dict[str, float] = field(default_factory=dict)
     opens: dict[str, float] = field(default_factory=dict)
+    unobserved_opens: Set[str] | None = None
     highs: dict[str, float] = field(default_factory=dict)
     lows: dict[str, float] = field(default_factory=dict)
     closes: dict[str, float] = field(default_factory=dict)
@@ -49,6 +50,14 @@ class OrderState:
     filled_this_bar: set[str] = field(default_factory=set)
     volume_consumed_by_asset: dict[str, float] = field(default_factory=dict)
     control_counts: dict[tuple[str, date], int] = field(default_factory=dict)
+
+    def bracket_entry(self, child: Order) -> Order | None:
+        # The order journal is append-only except when a transaction rolls back its own tail.
+        index = child._bracket_parent_index
+        if index is None or index >= len(self.orders):
+            return None
+        entry = self.orders[index]
+        return entry if entry.order_id == child.parent_id else None
 
 
 @dataclass(slots=True)

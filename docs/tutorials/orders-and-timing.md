@@ -61,7 +61,7 @@ for name, timing, kind, limit, stop in scenarios:
 ml4t-backtest {package_version}
 next market: 2024-01-03 @ $188.37
 same market: 2024-01-02 @ $188.00
-next limit: 2024-01-03 @ $188.50
+next limit: 2024-01-03 @ $188.37
 next stop: 2024-01-03 @ $191.00
 unfilled limit: no fill; pending=1
 ```
@@ -73,8 +73,9 @@ order is fixed in advance. If a decision depends on the completed bar's close,
 use next-bar execution. A close-conditioned signal cannot trade at an earlier
 open or assume it joined the already completed closing auction.
 
-The buy limit at $188.50 and buy stop at $191.00 both reached their trigger
-on the next bar and filled at their declared levels. The $170 limit never
+The resting buy limit at $188.50 fills at January 3's favorable $188.37
+open. The buy stop at $191.00 reaches its trigger on that bar and fills at
+$191.00. The $170 limit never
 traded and remains pending at the end of the input. `result.to_fills_dataframe()`
 contains only executed orders; `engine.broker.get_pending_orders()` shows the
 unfilled instruction. The [Order Types](../user-guide/orders.md) guide lists

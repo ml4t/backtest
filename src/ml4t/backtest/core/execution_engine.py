@@ -712,6 +712,15 @@ class ExecutionEngine:
                 and not include_orders_this_bar
             ):
                 continue
+            if order._bracket_parent_index is not None:
+                parent = self.orders.bracket_entry(order)
+                if (
+                    parent is None
+                    or parent.status is not OrderStatus.FILLED
+                    or parent._filled_bar_index is None
+                    or parent._filled_bar_index >= self.market.bar_index
+                ):
+                    continue
             eligible_orders.append(order)
         return eligible_orders
 
@@ -764,6 +773,18 @@ class ExecutionEngine:
             }:
                 self.orders.current_bar_ids.discard(order.order_id)
                 continue
+            if order._bracket_parent_index is not None:
+                parent = self.orders.bracket_entry(order)
+                if parent is not None and parent.status in {
+                    OrderStatus.REJECTED,
+                    OrderStatus.CANCELLED,
+                }:
+                    self.broker._capture_lifecycle_mutation(order_id=order.order_id)
+                    order.status = OrderStatus.CANCELLED
+                    order.cancelled_at = self.market.time
+                    order.cancellation_reason = f"bracket_entry_{parent.status.value.lower()}"
+                    self.orders.current_bar_ids.discard(order.order_id)
+                    continue
             new_pending.append(order)
         self.orders.pending[:] = new_pending
 

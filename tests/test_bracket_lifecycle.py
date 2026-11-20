@@ -264,9 +264,9 @@ class TestBracketPnLConsistency:
 
         # Hit TP
         if direction == "long":
-            set_broker_bar(broker, 106.0, ts=_ts(2), high=106.0, low=100.0)
+            set_broker_bar(broker, 106.0, ts=_ts(2), open_=100.0, high=106.0, low=100.0)
         else:
-            set_broker_bar(broker, 94.0, ts=_ts(2), high=100.0, low=94.0)
+            set_broker_bar(broker, 94.0, ts=_ts(2), open_=100.0, high=100.0, low=94.0)
 
         broker._process_orders()
 
