@@ -125,7 +125,11 @@ Retroactive corrections require a separately declared forward event.
 
 Declare `input_manifest={"price_basis": "raw"}` or pass an actual ML4T Data input
 snapshot manifest with raw bar-table metadata. Adjusted or unknown bar basis is
-rejected before the strategy runs. ML4T Data's
+rejected before the strategy runs, with one exception: when every action is a
+`merger` with `quantity_ratio=0`, a payout in cash alone. Such an action rescales
+no price or quantity, so it fits adjusted bars too; it is how a delisting with a
+known terminal value closes a position on a back-adjusted series, whose last bar
+is in the security's own units. ML4T Data's
 `ml4t.data.adjustments.prepare_action_inputs` validates and normalizes event facts;
 the caller must supply genuinely known publication, currency and missing economic
 terms. A bundle export's null publication field is not permission to invent one.
