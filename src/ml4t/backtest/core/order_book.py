@@ -365,8 +365,20 @@ class OrderBook:
                 order.cancellation_reason = reason
                 self.orders.pending.remove(order)
                 self.orders.partial_quantities.pop(order_id, None)
+                if order._has_bracket_exits:
+                    self.cancel_bracket_exits(
+                        order_id, timestamp=timestamp, reason="bracket_entry_cancelled"
+                    )
                 return True
         return False
+
+    def cancel_bracket_exits(
+        self, entry_id: str, *, reason: str, timestamp: datetime | None = None
+    ) -> None:
+        for child in self.orders.pending[:]:
+            if child._bracket_parent_index is not None and child.parent_id == entry_id:
+                self.broker._capture_lifecycle_mutation(order_id=child.order_id)
+                self.cancel_order(child.order_id, timestamp=timestamp, reason=reason)
 
     def get_order(self, order_id: str) -> Order | None:
         for order in self.orders.orders:

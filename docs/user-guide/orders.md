@@ -147,8 +147,9 @@ observed trigger instant, which is also retained on subsequent fills.
 ### Conditional price methods
 
 The native `conditional_order_mode="bar_ohlc"` uses bar extrema for triggers,
-fills limits at their limit level and fills newly triggered stops at the stop or
-gap-open price. When a stop activates intrabar and its limit requires a reversal,
+prices resting limits at a favorable opening price when observed, or at the limit
+level on an intrabar touch. A limit submitted after the open cannot use that bar's
+opening price. Newly triggered stops fill at the stop or gap-open price. When a stop activates intrabar and its limit requires a reversal,
 an earlier low/high cannot prove execution after activation. The order waits
 unless the opening gap or closing observation establishes that sequence.
 
@@ -228,7 +229,11 @@ if result is not None:
     entry_order, tp_order, sl_order = result
 ```
 
-The exit side is automatically determined from the entry direction. Price validation warns if take-profit is below entry (for longs) or stop-loss is above entry.
+The exit side follows the entry direction. Both legs wait for the entry to fill
+completely and are first eligible on the next market observation. Cancelling
+or rejecting the entry cancels both legs. A partial entry left by cancellation
+remains open and must be managed separately. A full exit fill cancels its sibling.
+Price validation warns if an exit price is on the wrong side of the reference entry price.
 
 ## Order Lifecycle
 

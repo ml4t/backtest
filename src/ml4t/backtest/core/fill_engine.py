@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from math import isfinite
 from typing import TYPE_CHECKING
 
 from ..config import ConditionalOrderMode, ExecutionPrice, LockNotionalUpdateMode, ShareType
 from ..models import AssetSlippage, estimate_commission
-from ..types import ExecutionMode, OrderSide, OrderType
+from ..types import ExecutionMode, Order, OrderSide, OrderType
 from .shared import CASH_TOLERANCE, add_with_zero_cancellation
 from .state import MarketState, OrderState
 
@@ -406,7 +407,8 @@ class FillEngine:
         if order.order_type in {OrderType.MARKET, OrderType.MOC}:
             return self.check_market_fill(order, price)
         if order.order_type == OrderType.LIMIT:
-            return self.check_limit_fill(order, high, low, price)
+            gap = self._resting_limit_open(order)
+            return gap if gap is not None else self.check_limit_fill(order, high, low, price)
         if order.order_type == OrderType.STOP:
             return self.check_stop_fill(order, high, low, bar_open, price)
         if order.order_type == OrderType.STOP_LIMIT:
@@ -415,7 +417,33 @@ class FillEngine:
             return self.update_and_check_trailing_stop(order, high, low, bar_open)
         return None
 
+    def _resting_limit_open(self, order: Order) -> float | None:
+        if (
+            self.broker.conditional_order_mode is not ConditionalOrderMode.BAR_OHLC
+            or order.limit_price is None
+            or order._created_bar_index >= self.market.bar_index
+        ):
+            return None
+        missing = self.market.unobserved_opens
+        if missing is not None and order.asset in missing:
+            return None
+        opening = self.market.opens.get(order.asset)
+        if (
+            opening is not None
+            and opening > 0
+            and isfinite(opening)
+            and (
+                order.side is OrderSide.BUY
+                and opening < order.limit_price
+                or order.side is OrderSide.SELL
+                and opening > order.limit_price
+            )
+        ):
+            return opening
+        return None
+
     def execute_fill(self, order, base_price: float, *, use_open: bool = False) -> bool:
-        return self.executor.execute(
-            order, base_price, price_source=self.get_fill_price_source(order, use_open).value
-        )
+        price_source = self.get_fill_price_source(order, use_open)
+        if order.order_type is OrderType.LIMIT and self._resting_limit_open(order) == base_price:
+            price_source = ExecutionPrice.OPEN
+        return self.executor.execute(order, base_price, price_source=price_source.value)

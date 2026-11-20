@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import logging
 from collections import deque
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Set
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import date, datetime
@@ -2451,9 +2451,13 @@ class Broker:
         """
         import warnings
 
+        entry_index = len(self._order_state.orders)
         entry = self.submit_order(asset, quantity, order_type=entry_type, limit_price=entry_limit)
         if entry is None:
             return None
+        entry._has_bracket_exits = True
+        if entry.status is OrderStatus.FILLED:
+            entry._filled_bar_index = self._bar_index
 
         # Derive exit side from entry direction (Bug #4 fix)
         # Long entry (BUY) -> SELL to exit; Short entry (SELL) -> BUY to cover
@@ -2503,11 +2507,15 @@ class Broker:
         if tp is None:
             return None
         tp.parent_id = entry.order_id
+        tp._bracket_parent_index = entry_index
 
         sl = self.submit_order(asset, exit_qty, exit_side, OrderType.STOP, stop_price=stop_loss)
         if sl is None:
             return None
         sl.parent_id = entry.order_id
+        sl._bracket_parent_index = entry_index
+        if entry.status is OrderStatus.REJECTED:
+            self._order_book.cancel_bracket_exits(entry.order_id, reason="bracket_entry_rejected")
 
         return entry, tp, sl
 
@@ -3275,6 +3283,7 @@ class Broker:
         highs: dict[str, float] | None = None,
         lows: dict[str, float] | None = None,
         *rest,
+        unobserved_opens: Set[str] | None = None,
         **kwargs,
     ):
         if kwargs:
@@ -3322,6 +3331,7 @@ class Broker:
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens
+        self._market_state.unobserved_opens = unobserved_opens
         self._current_highs = highs
         self._current_lows = lows
         self._current_closes = closes

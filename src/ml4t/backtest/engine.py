@@ -525,6 +525,7 @@ class Engine:
                     self._skipped_bars += 1
                     continue
 
+            unobserved_opens = getattr(assets_data, "_unobserved_opens", None)
             if self.runtime is not None:
                 if not self.runtime._accepts(timestamp):
                     continue
@@ -589,13 +590,19 @@ class Engine:
                     for a, d in assets_data.items()
                     if (close := d.get("close", d.get("price"))) is not None
                 }
+                missing_opens = set()
                 for asset, data in assets_data.items():
                     base_price = data.get("close")
                     if base_price is None:
                         base_price = data.get("price")
-                    opens[asset] = data.get("open") if data.get("open") is not None else base_price
+                    observed_open = data.get("open")
+                    if observed_open is None:
+                        missing_opens.add(asset)
+                    opens[asset] = observed_open if observed_open is not None else base_price
                     highs[asset] = data.get("high") if data.get("high") is not None else base_price
                     lows[asset] = data.get("low") if data.get("low") is not None else base_price
+                if missing_opens:
+                    unobserved_opens = missing_opens | (unobserved_opens or set())
                 volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
                 vwaps = {a: d["vwap"] for a, d in assets_data.items() if d.get("vwap") is not None}
                 bids = {a: d["bid"] for a, d in assets_data.items() if d.get("bid") is not None}
@@ -628,6 +635,7 @@ class Engine:
                 bid_sizes,
                 ask_sizes,
                 signals,
+                unobserved_opens=unobserved_opens,
             )
             if corporate_actions is not None:
                 corporate_actions.refresh()
