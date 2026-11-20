@@ -1111,6 +1111,12 @@ class RuntimeServices:
         if not self.known_at_cols and not signal_fields and self._assets is None:
             return data
         visible = {asset: dict(values) for asset, values in data.items()}
+        # A bar at the current timestamp is published to an inclusive clock. Without known-at or
+        # eligibility declarations, or instrument lifetimes for quotes, no market field can be
+        # masked, so the per-asset, per-field checks below are skipped.
+        masks_market = bool(market._known_at_cols or market._eligible_cols) or (
+            market._quote_fields and self._assets is not None
+        )
         for asset, values in visible.items():
             if signal_fields:
                 assert signal_view is not None
@@ -1122,6 +1128,8 @@ class RuntimeServices:
                         if not view._available(field, signal):
                             delivered[field] = None
                     values["signals"] = delivered
+            if not masks_market:
+                continue
             row = market._row(asset, timestamp)
             if row is None:
                 continue
