@@ -2,7 +2,41 @@
 
 <!-- Generated from release/changelog.json. Do not edit managed entries. -->
 
-## 0.2.0 - Unreleased
+## 0.2.1 - Unreleased
+
+### Fixed
+
+- Close fractional positions exactly when their requested target weight is zero, without
+  submitting a false reversal. Preserve pending-exit controls.
+- Hold bracket exits until the parent entry is fully filled and a later observation is available.
+  Apply this eligibility rule under both fill orderings and preserve partial-fill and rejection
+  handling.
+- Use an observed favorable opening price for resting limit orders that gap through their limit.
+  Apply configured costs and continue enforcing the final execution-price bound; an intrabar touch
+  alone does not establish improvement after costs.
+
+### Added
+
+- Export order lineage, native fills and marked account state for the credential-free
+  Backtest-to-Live replay and Diagnostic comparison. Preserve the export through saved-result
+  round trips.
+- Replay marketable IOC orders against recorded displayed depth with explicit snapshot reuse and
+  depletion policies. Hidden liquidity and passive queue fills are outside this model.
+- Look up the November 2026 Polymarket US standard taker coefficient from the account's qualifying
+  volume at order insertion. Preserve the historical fee defaults and accept explicit account
+  rates for fixed-tier simulations.
+- Provide optional native Nautilus and pysystemtrade comparison workflows on frozen historical
+  inputs, including ETF and FX strategies, perpetual funding, and dated futures execution and
+  accounting. Keep each comparison's reference build and execution assumptions explicit.
+
+### Build and documentation
+
+- Update build and workflow dependencies and repair contributor-environment security locks.
+  Require PyArrow 26.0.1 or later in the pinned installed successor qualification cohort.
+- Correct the executable limit-order tutorial to match favorable opening fills and simplify
+  documentation navigation. Keep public examples qualified against the built wheel.
+
+## 0.2.0 - 2026-10-22
 
 ### Added
 
