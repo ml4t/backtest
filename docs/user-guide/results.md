@@ -685,7 +685,7 @@ The actual Data preparation test in `tests/test_benchmark_data.py` passes the
 reference's captured 0.9 factor through
 `ml4t.data.adjustments.prepare_adjusted_history`, then consumes the resulting
 return table through native Engine and the result artifact. It uses
-[Data source c3b9db80](https://github.com/ml4t/data/commit/c3b9db80a66397420fb27adeccc762559dd41e07)
+[Data source c3b9db80](https://github.com/ml4t/data/tree/c3b9db80a66397420fb27adeccc762559dd41e07)
 and Specs 0.2.0. This is a source-candidate integration. The report input uses
 explicit retrospective supplied factors, with historical factor publication
 left unknown; it is not a feature available to strategy decisions. Native Data
