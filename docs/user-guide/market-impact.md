@@ -88,15 +88,15 @@ charged separately when they execute.
 
 ### Prediction-Market Venue Fees
 
-`ml4t.backtest.prediction_market_fees` implements the published fee schedules
-of Kalshi, ForecastEx (via IBKR) and Polymarket US. Prices are dollars per
+`ml4t.backtest.prediction_market_fees` calculates fees for Kalshi, ForecastEx
+(via IBKR) and Polymarket US. Prices are dollars per
 contract in `[0, 1]`; buying NO at `q` is a purchase at `q`.
 
 | Venue | Fee per fill | Model |
 |-------|--------------|-------|
 | Kalshi | taker `round_up(M * 0.07 * C * P * (1 - P))`; maker 0, 0.25x or 0.5x taker by series `fee_type` | `KalshiCommission` |
 | ForecastEx | 0.01 per contract per side; no IBKR commission | `ForecastExCommission` |
-| Polymarket US | taker `0.0695 * C * p * (1 - p)`; maker rebate `0.0125 * C * p * (1 - p)` | `PolymarketUSCommission` |
+| Polymarket US | standard fee or rebate `theta * C * p * (1 - p)`; theta depends on the schedule and account | `PolymarketUSCommission` |
 
 Kalshi rounds the trade fee up to 0.000001. A non-direct member's balance is
 then aligned to whole cents, so one contract at 0.50 costs 0.02 instead of
@@ -104,7 +104,15 @@ then aligned to whole cents, so one contract at 0.50 costs 0.02 instead of
 this, and `kalshi_order_fees` adds the per-order rebate of accumulated
 overpayment. Polymarket US rounds each fill to the cent, half to even. The
 engine charges only non-negative fees, so `PolymarketUSCommission` charges a
-maker fill 0 and leaves out the rebate.
+maker fill 0 and leaves out the rebate. The historical Polymarket US defaults
+are still 0.0695 for takers and 0.0125 for the maker rebate. For the
+[November 2026 account tiers](https://docs.polymarket.us/fees), determine the
+account's qualifying USD volume at order insertion and pass
+`polymarket_us_taker_coefficient(volume).item()` as `fee_coefficient` for a
+fixed-tier simulation. Supply the venue-assigned coefficient instead when an
+onboarding rate or override applies. For a changing rate, pass per-fill
+coefficients to `polymarket_us_fee` in post-run research, using each order's
+insertion-time rate. A market's fee field alone cannot tell you the account tier.
 
 Assign a model to the broker before running:
 
@@ -139,6 +147,7 @@ kalshi = kalshi_fee(
     rounding="cent",
 )
 # array([0.02, 1.75, 0.02])
+# October 2026 defaults (use explicit account rates for the November 2026 schedule).
 polymarket = polymarket_us_fee(fills["price"], fills["contracts"], liquidity=fills["liquidity"])
 # array([ 0.017375,  1.7375  , -0.01125 ])
 ```

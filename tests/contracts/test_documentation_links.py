@@ -85,3 +85,48 @@ def test_homepage_internal_fragment_is_checked(tmp_path: Path) -> None:
     homepage.write_text('<article><a href="user-guide/#missing-section">Guide</a></article>')
     with pytest.raises(ValueError, match="missing anchor"):
         checker.check_links(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("responses", "recovers"),
+    [
+        pytest.param((503, 503, 503, 200), True, id="recovers-after-three-service-errors"),
+        pytest.param((503, 503, 503, 503), False, id="persistent-service-error-fails"),
+        pytest.param((404,), False, id="missing-target-fails-immediately"),
+    ],
+)
+def test_external_link_outages_are_retried_without_accepting_broken_targets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, responses: tuple[int, ...], recovers: bool
+) -> None:
+    checker = _load_checker()
+    requests: list[str] = []
+    pauses: list[float] = []
+    monkeypatch.setattr(checker.time, "sleep", pauses.append)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            status = responses[min(len(requests), len(responses) - 1)]
+            requests.append(self.path)
+            self.send_response(status)
+            self.end_headers()
+
+        def log_message(self, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever)
+    thread.start()
+    try:
+        _write_site(tmp_path, f"http://127.0.0.1:{server.server_port}/source-commit")
+        if recovers:
+            assert checker.check_links(tmp_path) == (1, 1)
+        else:
+            with pytest.raises(ValueError, match=f"HTTP Error {responses[-1]}"):
+                checker.check_links(tmp_path)
+        assert requests == ["/source-commit"] * len(responses)
+        assert len(pauses) == len(responses) - 1
+        assert all(pause > 0 for pause in pauses) and sum(pauses) <= 60
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()

@@ -808,7 +808,7 @@ its declared historical availability. See [dated instruments and lifetimes](stra
 The raw bundle export explicitly reports unavailable historical publication facts.
 
 The following preparation/read route was qualified using
-[Data source c3b9db80](https://github.com/ml4t/data/commit/c3b9db80a66397420fb27adeccc762559dd41e07),
+[Data source c3b9db80](https://github.com/ml4t/data/tree/c3b9db80a66397420fb27adeccc762559dd41e07),
 Specs 0.2.0 and published Zipline Reloaded 3.2.0. This is a source-candidate Data
 integration, not a claim that every published Data version has the exporter.
 Zipline is needed only in the one-time bundle export environment; reading the
@@ -919,7 +919,7 @@ declared lookbacks, observation cutoff, decision/publication instants and dated
 universe. Pass the resulting panel and `FeatureSpec` to the constructor above.
 The integration test in `tests/test_zipline_pipeline.py` regenerates
 `tests/fixtures/prepared_pipeline` through the public Engineer API. That route
-was qualified with [Engineer source 093b72d6](https://github.com/ml4t/engineer/commit/093b72d6801cf2b279f1aa682c6d2cabe45d494d)
+was qualified with [Engineer source 093b72d6](https://github.com/ml4t/engineer/tree/093b72d6801cf2b279f1aa682c6d2cabe45d494d)
 and Specs 0.2.0. The Backtest consumer needs neither Engineer nor Zipline
 installed.
 

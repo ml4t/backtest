@@ -21,8 +21,8 @@ The vectorized functions accept scalars, NumPy arrays, Python sequences and
 Polars Series, broadcast them against each other and return a float64
 ``numpy.ndarray`` of fees in dollars (0-d for all-scalar input).
 
-Fee figures were read from the venues' published schedules on 2026-10-08. They
-change; the module constants name the value in force on that date.
+Default coefficients preserve the schedules read on 2026-10-08. The
+Polymarket US taker-tier lookup separately models the November 2026 schedule.
 """
 
 from typing import Any, Literal
@@ -47,6 +47,7 @@ __all__ = [
     "kalshi_fee",
     "kalshi_order_fees",
     "polymarket_us_fee",
+    "polymarket_us_taker_coefficient",
 ]
 
 Liquidity = Literal["taker", "maker"]
@@ -69,7 +70,7 @@ FORECASTEX_EXCHANGE_FEE = 0.01
 """ForecastEx transaction fee per contract per side, in force from 2026-03-31."""
 
 POLYMARKET_US_TAKER_COEFFICIENT = 0.0695
-"""Polymarket US standard taker coefficient (theta), effective 2026-10-01."""
+"""Historical taker default (October 2026); also the November schedule's Tier 4."""
 
 POLYMARKET_US_MAKER_REBATE_COEFFICIENT = 0.0125
 """Polymarket US maker rebate coefficient (magnitude of theta = -0.0125)."""
@@ -427,6 +428,26 @@ class ForecastExCommission:
 # === Polymarket US ===
 
 
+def polymarket_us_taker_coefficient(qualifying_taker_volume: ArrayInput) -> np.ndarray:
+    """Select the standard Polymarket US taker coefficient by qualifying USD volume.
+
+    Uses the [exchange-wide schedule effective November 14, 2026](https://docs.polymarket.us/fees).
+    The input is the account's qualifying volume at order insertion. Normally
+    this is the sum over the preceding 30 completed Eastern Time calendar days,
+    excluding the current day. The lookup does not compute the volume, handle
+    onboarding or manual overrides, or derive a rate from market metadata.
+
+    Use the returned coefficient with `polymarket_us_fee` or pass a single value
+    to `PolymarketUSCommission` for a backtest with a fixed known account tier.
+    """
+    volume = _floats("qualifying_taker_volume", qualifying_taker_volume)
+    if np.any(volume < 0.0):
+        raise ValueError("qualifying_taker_volume must be non-negative USD")
+    thresholds = (10_000, 50_000, 250_000)
+    coefficients = np.array((0.095, 0.085, 0.075, 0.0695))
+    return np.asarray(coefficients[np.searchsorted(thresholds, volume, side="right")])
+
+
 def polymarket_us_fee(
     price: ArrayInput,
     contracts: ArrayInput,
@@ -438,11 +459,12 @@ def polymarket_us_fee(
 ) -> np.ndarray:
     """Polymarket US fee per fill; a maker rebate is a negative fee.
 
-    Taker: ``theta * C * p * (1 - p)`` with ``theta = 0.0695`` (1,000 contracts
-    at 0.50 pay 17.38 after rounding). Maker: ``-0.0125 * C * p * (1 - p)``,
-    paid at the trade. ``fee_coefficient`` is the taker theta; pass the
-    ``fee_coefficient`` column of ml4t-data's ``PolymarketUSProvider`` market
-    table (the venue's ``feeCoefficient``) to apply a per-market value.
+    Taker: ``theta * C * p * (1 - p)``. The default theta (0.0695) and
+    default maker rebate magnitude (0.0125) preserve the October 2026 schedule.
+    Under the November 2026 schedule, pass the account's coefficient at order
+    insertion. Use `polymarket_us_taker_coefficient` for a standard taker tier
+    or pass the venue-assigned rate explicitly when it differs. A market's
+    ``feeCoefficient`` is insufficient to determine an account's rate.
 
     Rounding: ``"exact"`` returns the formula value; ``"cent"`` rounds each fill
     to 0.01 with round-half-to-even, as the venue charges it, so small fees can
@@ -450,11 +472,11 @@ def polymarket_us_fee(
     at the rounded cumulative fee; per-fill rounding can exceed that cap by up
     to 0.005 per fill.
 
-    Not modeled: the combo taker curve ``C * p * [0.0695 * (1 - p) + 0.06 *
-    (1 - p)^4]`` and the prior-month taker volume rebates (10%, 25%, 50%).
+    Combo fees and weekly taker rebates are outside this per-fill function.
+    To calculate a current maker rebate, pass its coefficient explicitly
+    (including zero when the account has no rebate).
 
-    Source: Polymarket US fee schedule, https://docs.polymarket.us/fees (read
-    2026-10-08).
+    Source: Polymarket US fee schedule, https://docs.polymarket.us/fees.
 
     Args:
         price: Execution price in ``[0, 1]``.
@@ -488,14 +510,14 @@ class PolymarketUSCommission:
     """Polymarket US taker fee as an engine ``CommissionModel``.
 
     The engine charges only non-negative commissions, so a maker fill is
-    charged 0 and its rebate (0.0125 x C x p x (1 - p)) is left out, which
+    charged 0 and its rebate is left out, which
     overstates maker costs. Use `polymarket_us_fee` where the rebate matters.
 
     Formula, rounding and sources: see `polymarket_us_fee`.
 
     Args:
         liquidity: ``"taker"`` or ``"maker"`` for every fill.
-        fee_coefficient: Taker theta of the market.
+        fee_coefficient: Fixed taker theta for the modeled account and period.
         rounding: ``"exact"`` or ``"cent"``.
     """
 
