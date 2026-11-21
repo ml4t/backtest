@@ -55,7 +55,28 @@ def _number(row: dict[str, Any], key: str, *, positive: bool = False) -> float:
     return float(value)
 
 
-def _raw_metadata(manifest: dict[str, Any] | None) -> None:
+def _cash_conversions_only(frame: Any) -> bool:
+    """True when every action is a merger paid in cash alone (quantity_ratio 0).
+
+    Such an action removes a position at a stated cash amount. It rescales no price or
+    quantity, so it cannot double count an adjustment already in the prices. This is how a
+    delisting with a known terminal value is expressed on adjusted prices: a back-adjusted
+    series ends in the security's own last units, because no later action exists.
+    """
+    if not isinstance(frame, pl.DataFrame) or frame.is_empty():
+        return False
+    if not {"action_kind", "quantity_ratio"} <= set(frame.columns):
+        return False
+    return bool(
+        frame.select(
+            (pl.col("action_kind") == "merger").all() & (pl.col("quantity_ratio") == 0).all()
+        ).item()
+    )
+
+
+def _raw_metadata(manifest: dict[str, Any] | None, frame: Any = None) -> None:
+    if _cash_conversions_only(frame):
+        return
     if not isinstance(manifest, dict):
         raise ValueError("Raw corporate actions require declared input_manifest price_basis")
     entries = manifest.get("content", {}).get("tables")
@@ -94,7 +115,7 @@ class CorporateActionLedger:
         orders: OrderState,
         journal: ExecutionJournal,
     ) -> None:
-        _raw_metadata(manifest)
+        _raw_metadata(manifest, frame)
         if not isinstance(frame, pl.DataFrame):
             raise TypeError("corporate_actions must be a Polars DataFrame")
         required = {

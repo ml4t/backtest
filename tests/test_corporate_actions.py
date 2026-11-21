@@ -221,6 +221,62 @@ def test_raw_action_against_adjusted_prices_is_rejected_before_execution():
         Engine(feed, Cash(), BacktestConfig(calendar=None))
 
 
+def test_cash_only_merger_pays_out_on_adjusted_prices():
+    """A delisting with a known terminal value: cash per share, no new shares, on adjusted bars.
+
+    Nothing is rescaled, so the adjusted basis cannot be double counted. A stock merger, which
+    hands out new shares, is still refused on adjusted prices.
+    """
+    prices = pl.DataFrame(
+        {
+            "timestamp": TIMES[:3] + TIMES[3:],
+            "asset": ["A"] * 3 + ["B"] * 2,
+            "close": [100.0, 100.0, 90.0, 50.0, 50.0],
+        }
+    )
+    terminal = action(
+        "merger",
+        quantity_ratio=0.0,
+        cash_component=80.0,
+        effective_at=TIMES[3],
+        available_at=TIMES[3],
+    )
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+
+    feed = DataFeed(
+        prices_df=prices,
+        corporate_actions=pl.DataFrame([terminal]),
+        input_manifest={"price_basis": "total_return"},
+    )
+    config = BacktestConfig(initial_cash=10000, calendar=None, commission_rate=0, slippage_rate=0)
+    specs = {"A": ContractSpec("A"), "B": ContractSpec("B")}
+    engine = Engine(feed, Buy(), config, holdings_sampling="bar", contract_specs=specs)
+    result = engine.run()
+
+    assert engine.broker.get_position("A") is None
+    assert engine.broker.cash == 10000 - 10 * 100 + 10 * 80
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "merger").height == 1
+
+    stock_merger = action(
+        "merger",
+        quantity_ratio=0.5,
+        cash_component=0.0,
+        destination_asset="B",
+        effective_at=TIMES[3],
+    )
+    feed = DataFeed(
+        prices_df=prices,
+        corporate_actions=pl.DataFrame([stock_merger]),
+        input_manifest={"price_basis": "total_return"},
+    )
+    with pytest.raises(ValueError, match="raw"):
+        Engine(feed, Buy(), config, contract_specs=specs)
+
+
 @pytest.mark.parametrize("policy", ["declared_terms", "zipline_3_2"])
 def test_action_artifact_keeps_paid_lineage_and_actual_receivables_without_fabricating_legacy_history(
     tmp_path, policy
