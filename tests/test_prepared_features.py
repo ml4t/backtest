@@ -3,6 +3,7 @@
 import hashlib
 import json
 from copy import deepcopy
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -140,6 +141,47 @@ def test_late_publication_hides_the_actual_feature_payload_without_changing_its_
     Engine(_feed(panel), Read(), BacktestConfig(calendar=None)).run()
     assert seen == [None, None]
     assert panel["average"].to_list() == [2.0, 20.0, 3.0, 30.0]
+
+
+@pytest.mark.parametrize("late", [False, True])
+def test_feature_values_reach_a_strategy_only_at_decisions_when_prices_have_events_between_them(
+    late,
+):
+    panel = _panel()
+    if late:
+        panel = panel.with_columns(
+            pl.when(pl.col("asset") == "A")
+            .then(pl.col("decision_time") + pl.duration(seconds=1))
+            .otherwise(pl.col("available_at"))
+            .alias("available_at")
+        )
+    prices = _panel().select(
+        pl.col("decision_time").alias("timestamp"), "asset", pl.lit(100.0).alias("close")
+    )
+    between = prices["timestamp"].min() + timedelta(hours=1)
+    extra = pl.select(
+        pl.lit(between, dtype=prices.schema["timestamp"]).alias("timestamp"),
+        pl.Series("asset", ["A", "B"]),
+        pl.lit(100.0).alias("close"),
+    )
+    feed = DataFeed(
+        prices_df=pl.concat([prices, extra]).sort("timestamp", "asset"),
+        signals_df=panel,
+        feature_spec=MANIFEST["feature_spec"],
+        feed_spec={
+            "time_contract_version": 2,
+            "calendar": None,
+            "timestamp_semantics": "event_time",
+        },
+    )
+    seen = []
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            seen.append((data["A"].get("signals") or {}).get("average"))
+
+    Engine(feed, Read(), BacktestConfig(calendar=None)).run()
+    assert seen == ([None, None, None] if late else [2.0, None, 3.0])
 
 
 def test_feature_metadata_is_a_defensive_copy_of_the_original_producer_contract():
