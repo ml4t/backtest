@@ -15,13 +15,29 @@ from ml4t.specs import FeedSpec, TimestampSemantics, WindowUnit
 
 from ._history_clock import expected_times, session_times
 from ._instruments import InstrumentSource, InstrumentView
-from ._temporal import temporal_frame, temporal_row, temporal_rows
+from ._temporal import temporal_frame, temporal_row, temporal_rows, timestamp_values
 from .auxiliary import AuxiliaryData
 from .execution.callbacks import SessionScheduler
 from .futures_lifecycle import FuturesLifecyclePolicy
 
 if TYPE_CHECKING:
     from .engine import Engine
+
+
+_QUOTE_FIELDS = (
+    "price",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "vwap",
+    "bid",
+    "ask",
+    "mid",
+    "bid_size",
+    "ask_size",
+)
 
 
 class PreparedHistory(Protocol):
@@ -137,26 +153,41 @@ class MarketDataView:
                 self._frame.schema[column], pl.Datetime
             ):
                 raise ValueError(f"Known-at column {column!r} must contain datetimes")
-        index_columns = list(
-            dict.fromkeys([self._timestamp_col, self._entity_col, *self._known_at_cols.values()])
+        stamps = self._frame[self._timestamp_col]
+        for column in dict.fromkeys(self._known_at_cols.values()):
+            if self._frame[column].null_count() == self._frame.height:
+                continue
+            known_dtype = self._frame.schema[column]
+            if not isinstance(stamps.dtype, pl.Datetime) or (
+                cast(pl.Datetime, known_dtype).time_zone is None
+            ) != (stamps.dtype.time_zone is None):
+                raise ValueError("Known-at and observation timezones must be compatible")
+        # One Python value per distinct instant, shared by every asset's index; rows are
+        # grouped by asset in Polars instead of being iterated one by one.
+        instants = stamps.unique().sort()
+        self._timestamps = timestamp_values(instants)
+        values = dict(zip(instants.to_physical().to_list(), self._timestamps, strict=True))
+        index = self._frame.select(
+            pl.col(self._entity_col), pl.col(self._timestamp_col).to_physical().alias("__ml4t_key")
+        ).with_row_index("__ml4t_row")
+        repeated = index.filter(
+            pl.struct(self._entity_col, "__ml4t_key").is_first_distinct().not_()
         )
-        for index, row in enumerate(temporal_rows(self._frame.select(index_columns), named=True)):
-            asset, timestamp = row[self._entity_col], row[self._timestamp_col]
-            rows = self._rows.setdefault(asset, {})
-            if timestamp in rows:
-                raise ValueError(f"Duplicate market observation for {asset!r} at {timestamp}")
-            for column in self._known_at_cols.values():
-                if row[column] is not None:
-                    try:
-                        _ = row[column] <= timestamp
-                    except TypeError as exc:
-                        raise ValueError(
-                            "Known-at and observation timezones must be compatible"
-                        ) from exc
-            rows[timestamp] = index
+        if repeated.height:
+            asset, key = repeated.row(0)[1:]
+            raise ValueError(f"Duplicate market observation for {asset!r} at {values[key]}")
+        for part in index.partition_by(self._entity_col, maintain_order=True):
+            self._rows[part[self._entity_col][0]] = dict(
+                zip(
+                    map(values.__getitem__, part["__ml4t_key"].to_list()),
+                    part["__ml4t_row"].to_list(),
+                    strict=True,
+                )
+            )
         for asset, rows in self._rows.items():
             self._times[asset] = sorted(rows)
-        self._timestamps = sorted({t for times in self._times.values() for t in times})
+        self._timestamp_set = frozenset(self._timestamps)
+        self._hidden: dict[frozenset[str], dict[int, tuple[str, ...]]] = {}
         self._asof: datetime | None = None
         self._inclusive = False
 
@@ -179,6 +210,47 @@ class MarketDataView:
     def _row(self, asset: str, timestamp: datetime) -> dict[str, Any] | None:
         index = self._rows.get(asset, {}).get(timestamp)
         return temporal_row(self._frame, index) if index is not None else None
+
+    def _hidden_at_own_time(self, fields: frozenset[str]) -> dict[int, tuple[str, ...]]:
+        """Row index -> the fields `_available` masks when the clock stands at that row's time.
+
+        Valid only for views without quote fields: they read inclusively and carry no instrument
+        lifetime, so the mask of a row at its own timestamp depends on the row alone and is
+        computed once, in Polars, for every row.
+        """
+        assert not self._quote_fields
+        cached = self._hidden.get(fields)
+        if cached is not None:
+            return cached
+        timestamp = pl.col(self._timestamp_col)
+        dtype = self._frame.schema[self._timestamp_col]
+        masks = []
+        for field in sorted(fields):
+            declaration = self._known_at_cols.get(field)
+            hidden = (
+                timestamp.is_null()
+                if declaration is None
+                else pl.col(declaration).is_null() | (pl.col(declaration).cast(dtype) > timestamp)
+            )
+            eligible = self._eligible_cols.get(field)
+            if eligible is not None:
+                hidden = hidden | pl.col(eligible).fill_null(False).not_()
+            masks.append(pl.when(hidden).then(pl.lit(field)))
+        cached = (
+            {
+                row: tuple(names)
+                for row, names in self._frame.select(
+                    pl.concat_list(masks).list.drop_nulls().alias("hidden")
+                )
+                .with_row_index("row")
+                .filter(pl.col("hidden").list.len() > 0)
+                .iter_rows()
+            }
+            if masks
+            else {}
+        )
+        self._hidden[fields] = cached
+        return cached
 
     def _column(self, field: str) -> str:
         return self._roles.get(field, field)
@@ -1110,43 +1182,49 @@ class RuntimeServices:
         )
         if not self.known_at_cols and not signal_fields and self._assets is None:
             return data
-        visible = {asset: dict(values) for asset, values in data.items()}
         # A bar at the current timestamp is published to an inclusive clock. Without known-at or
         # eligibility declarations, or instrument lifetimes for quotes, no market field can be
         # masked, so the per-asset, per-field checks below are skipped.
         masks_market = bool(market._known_at_cols or market._eligible_cols) or (
             market._quote_fields and self._assets is not None
         )
+        check_signals = (
+            signal_view is not None
+            and bool(signal_fields)
+            and timestamp in signal_view._timestamp_set
+        )
+        if not masks_market and not check_signals:
+            return data  # no signal row at this event and no market field to mask
+        # The clock stands at the signal rows' own timestamp, so their masks are precomputed.
+        hidden = (
+            signal_view._hidden_at_own_time(frozenset(signal_fields))
+            if check_signals and signal_view is not None
+            else {}
+        )
+        visible = {asset: dict(values) for asset, values in data.items()}
         for asset, values in visible.items():
-            if signal_fields:
+            if check_signals:
                 assert signal_view is not None
-                view = signal_view
-                signal = view._row(asset, timestamp)
-                if signal is not None:
+                index = signal_view._rows.get(asset, {}).get(timestamp)
+                if index is not None:
                     delivered = dict(values.get("signals", {}))
-                    for field in signal_fields:
-                        if not view._available(field, signal):
-                            delivered[field] = None
+                    delivered.update(dict.fromkeys(hidden.get(index, ())))
                     values["signals"] = delivered
             if not masks_market:
+                continue
+            if not (market._known_at_cols or market._eligible_cols):
+                # Only an instrument's lifetime can mask this bar; it masks every field at once,
+                # so one membership check replaces reading the row and testing each field.
+                assert self._assets is not None
+                if timestamp in market._rows.get(asset, {}) and not self._assets._active_at(
+                    asset, timestamp, timestamp
+                ):
+                    values.update(dict.fromkeys(_QUOTE_FIELDS))
                 continue
             row = market._row(asset, timestamp)
             if row is None:
                 continue
-            for field in [
-                "price",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "vwap",
-                "bid",
-                "ask",
-                "mid",
-                "bid_size",
-                "ask_size",
-            ]:
+            for field in _QUOTE_FIELDS:
                 raw = market._column(field)
                 source = (
                     field
