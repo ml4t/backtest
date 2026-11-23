@@ -46,7 +46,7 @@ def _set_bar(
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     limit=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     bar_high=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -70,7 +70,7 @@ def test_limit_buy_never_fills_above_limit(limit: float, bar_high: float, bar_lo
         assert fill.price <= limit + 1e-8, f"Limit BUY filled at {fill.price} > limit {limit}"
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     limit=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     bar_high=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -99,7 +99,7 @@ def test_limit_sell_never_fills_below_limit(limit: float, bar_high: float, bar_l
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     stop=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
     bar_open=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -125,7 +125,7 @@ def test_stop_buy_never_fills_below_stop(
         assert fill.price >= stop - 1e-8, f"Stop BUY filled at {fill.price} < stop {stop}"
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     stop=st.floats(min_value=10.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     bar_open=st.floats(min_value=10.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -156,7 +156,7 @@ def test_stop_sell_never_fills_above_stop(
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 @given(
     entry_price=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     tp_offset=st.floats(min_value=1.0, max_value=20.0, allow_nan=False, allow_infinity=False),

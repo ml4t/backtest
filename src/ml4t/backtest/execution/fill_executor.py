@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ..config import InitialHwmSource, LockNotionalUpdateMode, ShareType
+from ..config import InitialHwmSource, LimitSlippagePolicy, LockNotionalUpdateMode, ShareType
 from ..core.shared import CASH_TOLERANCE, add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
 from ..models import (
@@ -322,6 +322,7 @@ class FillExecutor:
             limit_price=order.limit_price,
             stop_price=order.stop_price,
             stop_triggered_at=order.stop_triggered_at,
+            trigger_price=order._trigger_price,
             price_source=price_source,
             reference_price=quote_context["reference_price"],
             quote_mid_price=quote_context["quote_mid_price"],
@@ -522,6 +523,7 @@ class FillExecutor:
         quote: bool,
     ) -> tuple[float, float]:
         broker = self.broker
+        original_base = base_price
         impact_model = broker.market_impact_model
         slippage_model = broker.slippage_model
         if isinstance(slippage_model, AssetSlippage):
@@ -555,6 +557,18 @@ class FillExecutor:
         )
         price = base_price + slippage if order.side is OrderSide.BUY else base_price - slippage
         self._validate_execution_price(price, source="execution price")
+        if (
+            broker.limit_slippage_policy is LimitSlippagePolicy.CLAMP
+            and order.order_type in {OrderType.LIMIT, OrderType.STOP_LIMIT}
+            and self._within_limit(order, original_base)
+            and not self._within_limit(order, price)
+        ):
+            assert order.limit_price is not None
+            price = order.limit_price
+            # Impact is applied first. Retain only the slippage actually paid after capping.
+            slippage = min(
+                slippage, max(0.0, abs(price - original_base) - abs(base_price - original_base))
+            )
         return price, slippage
 
     def _slippage_context(

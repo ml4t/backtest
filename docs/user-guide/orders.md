@@ -146,6 +146,28 @@ observed trigger instant, which is also retained on subsequent fills.
 
 ### Conditional price methods
 
+`limit_slippage_policy="defer"` preserves the default: a touched limit remains
+pending if slippage or impact would put its execution outside the limit. Select
+`"clamp"` to cap those costs at the limit instead. This is an execution assumption,
+not a promise of liquidity at the touched level. Volume limits, affordability,
+commission and cancellation still apply to the actual capped fill; commissions
+are separate from the limit price. A quote already outside a limit never becomes
+executable by clamping.
+
+`conditional_order_mode="trade_quote"` triggers pending stops, limits and
+stop-limits from the current **close/trade observation**, then executes buys at
+that observation's ask and sells at its bid. Declare `bid_col` and `ask_col` on
+`DataFeed`. An absent, non-finite or nonpositive opposite quote raises instead of
+inventing an execution. This mode is intended for synchronized trade/quote
+observations. On aggregate bars it tests the close only; it does not infer the
+quote at an earlier high/low crossing. Slippage and impact apply after the quote,
+and all limit bounds remain enforced. Bracket legs use the same method.
+
+The fill's `trigger_price` retains the trade that activated the order. A partially
+filled stop remains active and later fills keep its original trigger price and
+`stop_triggered_at`. Later fills execute against their own observation's quote.
+
+
 The native `conditional_order_mode="bar_ohlc"` uses bar extrema for triggers,
 prices resting limits at a favorable opening price when observed, or at the limit
 level on an intrabar touch. A limit submitted after the open cannot use that bar's

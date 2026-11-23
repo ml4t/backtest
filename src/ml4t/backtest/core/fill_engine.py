@@ -249,6 +249,17 @@ class FillEngine:
         return source
 
     def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
+        if (
+            self.broker.conditional_order_mode is ConditionalOrderMode.TRADE_QUOTE
+            and order.order_type in {OrderType.LIMIT, OrderType.STOP, OrderType.STOP_LIMIT}
+        ):
+            quote = self.market.asks if order.side is OrderSide.BUY else self.market.bids
+            value = quote.get(order.asset)
+            if value is None or not isfinite(value) or value <= 0:
+                raise ValueError(
+                    "trade_quote conditional orders require an observed opposite quote"
+                )
+            return value
         return self.broker.get_price_for_source(
             self.get_fill_price_source(order, use_open),
             order.asset,
@@ -400,6 +411,11 @@ class FillEngine:
         return gap_price if gap_price is not None else order.stop_price
 
     def check_fill(self, order, price: float) -> float | None:
+        if (
+            self.broker.conditional_order_mode is ConditionalOrderMode.TRADE_QUOTE
+            and order.order_type in {OrderType.LIMIT, OrderType.STOP, OrderType.STOP_LIMIT}
+        ):
+            return self._trade_quote_fill(order, price)
         high = self.market.highs.get(order.asset, price)
         low = self.market.lows.get(order.asset, price)
         bar_open = self.market.opens.get(order.asset, price)
@@ -416,6 +432,39 @@ class FillEngine:
         if order.order_type == OrderType.TRAILING_STOP:
             return self.update_and_check_trailing_stop(order, high, low, bar_open)
         return None
+
+    def _trade_quote_fill(self, order: Order, quote: float) -> float | None:
+        trade = self.market.closes.get(order.asset)
+        if trade is None or not isfinite(trade) or trade <= 0:
+            return None
+        if order.order_type in {OrderType.STOP, OrderType.STOP_LIMIT}:
+            assert order.stop_price is not None
+            if not order._stop_triggered:
+                crossed = (
+                    trade >= order.stop_price
+                    if order.side is OrderSide.BUY
+                    else trade <= order.stop_price
+                )
+                if not crossed:
+                    return None
+                order._stop_triggered = True
+                order._stop_triggered_at = self.market.time
+                order._trigger_price = trade
+        if order.order_type in {OrderType.LIMIT, OrderType.STOP_LIMIT}:
+            assert order.limit_price is not None
+            crossed = (
+                trade <= order.limit_price
+                if order.side is OrderSide.BUY
+                else trade >= order.limit_price
+            )
+            if not crossed:
+                return None
+            if order.order_type is OrderType.LIMIT:
+                order._trigger_price = trade
+            # A quote outside the limit cannot be made executable by clamping it.
+            if not self.executor._within_limit(order, quote):
+                return None
+        return quote
 
     def _resting_limit_open(self, order: Order) -> float | None:
         if (
@@ -444,6 +493,11 @@ class FillEngine:
 
     def execute_fill(self, order, base_price: float, *, use_open: bool = False) -> bool:
         price_source = self.get_fill_price_source(order, use_open)
+        if (
+            self.broker.conditional_order_mode is ConditionalOrderMode.TRADE_QUOTE
+            and order.order_type in {OrderType.LIMIT, OrderType.STOP, OrderType.STOP_LIMIT}
+        ):
+            price_source = ExecutionPrice.ASK if order.side is OrderSide.BUY else ExecutionPrice.BID
         if order.order_type is OrderType.LIMIT and self._resting_limit_open(order) == base_price:
             price_source = ExecutionPrice.OPEN
         return self.executor.execute(order, base_price, price_source=price_source.value)

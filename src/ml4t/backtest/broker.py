@@ -23,6 +23,7 @@ from .config import (
     FillOrdering,
     InitialHwmSource,
     LateAssetPolicy,
+    LimitSlippagePolicy,
     LockNotionalUpdateMode,
     MissingPricePolicy,
     ShareType,
@@ -143,6 +144,7 @@ class Broker:
         cancel_policy: CancelPolicy = CancelPolicy.NEVER,
         *,
         conditional_order_mode: ConditionalOrderMode = ConditionalOrderMode.BAR_OHLC,
+        limit_slippage_policy: LimitSlippagePolicy = LimitSlippagePolicy.DEFER,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -163,6 +165,7 @@ class Broker:
         self.execution_mode = execution_mode
         self.execution_price = execution_price
         self.conditional_order_mode = ConditionalOrderMode(conditional_order_mode)
+        self.limit_slippage_policy = LimitSlippagePolicy(limit_slippage_policy)
         self.next_bar_execution_price = (
             ExecutionPrice(next_bar_execution_price)
             if next_bar_execution_price is not None
@@ -477,6 +480,7 @@ class Broker:
             next_bar_execution_price=config.next_bar_execution_price,
             cancel_policy=config.cancel_policy,
             conditional_order_mode=config.conditional_order_mode,
+            limit_slippage_policy=config.limit_slippage_policy,
             mark_price=config.mark_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
