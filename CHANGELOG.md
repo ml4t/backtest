@@ -28,6 +28,9 @@
 - Provide optional native Nautilus and pysystemtrade comparison workflows on frozen historical
   inputs, including ETF and FX strategies, perpetual funding, and dated futures execution and
   accounting. Keep each comparison's reference build and execution assumptions explicit.
+- Apply cash-only terminal mergers on recognized declared adjusted price bases. Require terminal
+  share units and history that excludes the terminal cash payout; retain raw-price requirements
+  for all other corporate actions.
 
 ### Build and documentation
 

@@ -55,7 +55,27 @@ def _number(row: dict[str, Any], key: str, *, positive: bool = False) -> float:
     return float(value)
 
 
-def _raw_metadata(manifest: dict[str, Any] | None) -> None:
+def _cash_conversions_only(frame: Any) -> bool:
+    """True when every action is a merger paid in cash alone (quantity_ratio 0).
+
+    Such an action removes a position at a stated cash amount. It rescales no price or
+    quantity. Its cash amount must use the position's terminal share units; the declared
+    adjusted history must not already contain the terminal cash payout.
+    """
+    if not isinstance(frame, pl.DataFrame) or frame.is_empty():
+        return False
+    if not {"action_kind", "quantity_ratio"} <= set(frame.columns):
+        return False
+    return bool(
+        frame.select(
+            ((pl.col("action_kind") == "merger") & (pl.col("quantity_ratio") == 0))
+            .fill_null(False)
+            .all()
+        ).item()
+    )
+
+
+def _raw_metadata(manifest: dict[str, Any] | None, frame: Any = None) -> None:
     if not isinstance(manifest, dict):
         raise ValueError("Raw corporate actions require declared input_manifest price_basis")
     entries = manifest.get("content", {}).get("tables")
@@ -67,6 +87,13 @@ def _raw_metadata(manifest: dict[str, Any] | None) -> None:
             for entry in entries.values()
             if entry.get("role") in {"prices", "bars", "daily_bars", "minute_bars"}
         ]
+    supported = {"raw", "split_adjusted", "total_return", "adjusted"}
+    if (
+        metadata
+        and _cash_conversions_only(frame)
+        and all(row.get("price_basis") in supported for row in metadata)
+    ):
+        return
     if not metadata or any(row.get("price_basis") != "raw" for row in metadata):
         raise ValueError(
             "Corporate actions require raw prices; adjusted or unknown basis double counts"
@@ -94,7 +121,7 @@ class CorporateActionLedger:
         orders: OrderState,
         journal: ExecutionJournal,
     ) -> None:
-        _raw_metadata(manifest)
+        _raw_metadata(manifest, frame)
         if not isinstance(frame, pl.DataFrame):
             raise TypeError("corporate_actions must be a Polars DataFrame")
         required = {

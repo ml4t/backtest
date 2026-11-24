@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy, run_backtest
-from ml4t.backtest.config import ShortCashPolicy
+from ml4t.backtest.config import ShareType, ShortCashPolicy
 from ml4t.backtest.types import ContractSpec
 
 START = datetime(2025, 3, 3, 21, tzinfo=UTC)
@@ -219,6 +219,62 @@ def test_raw_action_against_adjusted_prices_is_rejected_before_execution():
                 pass
 
         Engine(feed, Cash(), BacktestConfig(calendar=None))
+
+
+def test_cash_only_merger_pays_out_on_adjusted_prices():
+    """A delisting with a known terminal value: cash per share, no new shares, on adjusted bars.
+
+    Nothing is rescaled, so the adjusted basis cannot be double counted. A stock merger, which
+    hands out new shares, is still refused on adjusted prices.
+    """
+    prices = pl.DataFrame(
+        {
+            "timestamp": TIMES[:3] + TIMES[3:],
+            "asset": ["A"] * 3 + ["B"] * 2,
+            "close": [100.0, 100.0, 90.0, 50.0, 50.0],
+        }
+    )
+    terminal = action(
+        "merger",
+        quantity_ratio=0.0,
+        cash_component=80.0,
+        effective_at=TIMES[3],
+        available_at=TIMES[3],
+    )
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+
+    feed = DataFeed(
+        prices_df=prices,
+        corporate_actions=pl.DataFrame([terminal]),
+        input_manifest={"price_basis": "total_return"},
+    )
+    config = BacktestConfig(initial_cash=10000, calendar=None, commission_rate=0, slippage_rate=0)
+    specs = {"A": ContractSpec("A"), "B": ContractSpec("B")}
+    engine = Engine(feed, Buy(), config, holdings_sampling="bar", contract_specs=specs)
+    result = engine.run()
+
+    assert engine.broker.get_position("A") is None
+    assert engine.broker.cash == 10000 - 10 * 100 + 10 * 80
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "merger").height == 1
+
+    stock_merger = action(
+        "merger",
+        quantity_ratio=0.5,
+        cash_component=0.0,
+        destination_asset="B",
+        effective_at=TIMES[3],
+    )
+    feed = DataFeed(
+        prices_df=prices,
+        corporate_actions=pl.DataFrame([stock_merger]),
+        input_manifest={"price_basis": "total_return"},
+    )
+    with pytest.raises(ValueError, match="raw"):
+        Engine(feed, Buy(), config, contract_specs=specs)
 
 
 @pytest.mark.parametrize("policy", ["declared_terms", "zipline_3_2"])
@@ -609,3 +665,111 @@ def test_own_share_dividend_rebases_only_the_account_mark_without_creating_a_fut
     assert seen[0][2] == 100
     assert seen[0][3] == pytest.approx(10000, rel=0, abs=1e-9)
     assert result.equity_curve[-1][1] == pytest.approx(10000, rel=0, abs=1e-9)
+
+
+@pytest.mark.parametrize(
+    "manifest", [None, {}, {"price_basis": "unknown"}, {"price_basis": "bogus"}]
+)
+def test_cash_only_merger_still_requires_a_declared_supported_price_basis(manifest):
+    prices = pl.DataFrame({"timestamp": TIMES, "asset": ["A"] * 5, "close": [100.0] * 5})
+    terminal = action("merger", quantity_ratio=0.0, cash_component=80.0)
+    started = []
+
+    class Buy(Strategy):
+        def on_data(self, *args):
+            started.append(True)
+
+    feed = DataFeed(
+        prices_df=prices, corporate_actions=pl.DataFrame([terminal]), input_manifest=manifest
+    )
+    with pytest.raises(ValueError, match="price_basis|basis|raw"):
+        Engine(feed, Buy(), BacktestConfig(calendar=None), contract_specs={"A": ContractSpec("A")})
+    assert not started
+
+
+@pytest.mark.parametrize("basis", ["raw", "split_adjusted", "total_return"])
+@pytest.mark.parametrize("quantity", [10.0, -10.0, 2.5])
+def test_adjusted_terminal_merger_closes_once_and_removes_marked_nav(basis, quantity):
+    prices = pl.DataFrame(
+        {
+            "timestamp": TIMES,
+            "asset": ["A"] * 3 + ["B"] * 2,
+            "close": [100.0, 100.0, 90.0, 50.0, 60.0],
+        }
+    )
+    terminal = action("merger", quantity_ratio=0.0, cash_component=80.0, effective_at=TIMES[3])
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", quantity)
+
+    # Duplicate identical source facts must not pay twice.
+    feed = DataFeed(
+        prices_df=prices,
+        corporate_actions=pl.DataFrame([terminal, terminal]),
+        input_manifest={
+            "content": {
+                "tables": {"daily_bars": {"role": "daily_bars", "metadata": {"price_basis": basis}}}
+            }
+        },
+    )
+    engine = Engine(
+        feed,
+        Buy(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=10000,
+            allow_short_selling=True,
+            share_type=ShareType.FRACTIONAL,
+        ),
+        contract_specs={a: ContractSpec(a) for a in ["A", "B"]},
+    )
+    result = engine.run()
+    expected = 10000 - quantity * 100 + quantity * 80
+    assert engine.broker.get_position("A") is None
+    assert engine.broker.cash == expected
+    assert result.to_equity_dataframe()["equity"].to_list() == [
+        10000,
+        10000,
+        10000 - quantity * 10,
+        expected,
+        expected,
+    ]
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "merger").height == 1
+    assert len(result.fills) == 1
+
+
+@pytest.mark.parametrize(
+    "kind,terms",
+    [
+        ("split", {"split_ratio": 2.0}),
+        ("cash_dividend", {"cash_per_share": 1.0, "payment_at": TIMES[3]}),
+        (
+            "stock_distribution",
+            {"quantity_ratio": 1.0, "destination_asset": "B", "payment_at": TIMES[3]},
+        ),
+        ("merger", {"quantity_ratio": 0.5, "cash_component": 1.0, "destination_asset": "B"}),
+    ],
+)
+def test_adjusted_terminal_exception_rejects_mixed_rescaling_or_distribution_actions(kind, terms):
+    prices = pl.DataFrame({"timestamp": TIMES, "asset": ["A"] * 5, "close": [100.0] * 5})
+    events = [
+        action("merger", quantity_ratio=0.0, cash_component=80.0),
+        action(kind, event_id="other", **terms),
+    ]
+
+    class Cash(Strategy):
+        def on_data(self, *args):
+            pass
+
+    with pytest.raises(ValueError, match="raw"):
+        Engine(
+            DataFeed(
+                prices_df=prices,
+                corporate_actions=pl.DataFrame(events),
+                input_manifest={"price_basis": "total_return"},
+            ),
+            Cash(),
+            BacktestConfig(calendar=None),
+        )

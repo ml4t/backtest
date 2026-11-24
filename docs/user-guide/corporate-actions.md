@@ -125,7 +125,16 @@ Retroactive corrections require a separately declared forward event.
 
 Declare `input_manifest={"price_basis": "raw"}` or pass an actual ML4T Data input
 snapshot manifest with raw bar-table metadata. Adjusted or unknown bar basis is
-rejected before the strategy runs. ML4T Data's
+rejected before the strategy runs, with one exception. When every action is a
+`merger` with `quantity_ratio=0`, the ledger accepts a declared `raw`,
+`split_adjusted`, `total_return` or `adjusted` bar basis. Missing or unknown basis
+is still rejected. Cash-only mergers close the position without rescaling shares
+or prices. Declare the cash component per terminal share, in the position's
+currency. Adjusted bars must retain the security's terminal share units and
+exclude the terminal payout itself. A series that already includes those cash
+proceeds would count them twice; the ledger cannot infer that from price values.
+Splits, cash/stock distributions and stock mergers still require raw prices,
+including when mixed with a cash-only merger. ML4T Data's
 `ml4t.data.adjustments.prepare_action_inputs` validates and normalizes event facts;
 the caller must supply genuinely known publication, currency and missing economic
 terms. A bundle export's null publication field is not permission to invent one.
