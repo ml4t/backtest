@@ -38,6 +38,12 @@
 - Retry transient external documentation-link failures with bounded backoff. Broken links and
   persistent service errors still fail qualification.
 
+### Changed
+
+- Avoid redundant prepared-signal masking and per-row index construction in RuntimeServices.
+  Preserve exact publication timestamps, eligibility, missing observations and instrument
+  lifetimes.
+
 ## 0.2.0 - 2026-10-22
 
 ### Added
