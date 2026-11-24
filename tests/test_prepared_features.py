@@ -262,3 +262,50 @@ def test_captured_panel_can_be_rebuilt_by_the_actual_installed_engineer_producer
         actual = actual.collect() if isinstance(actual, pl.LazyFrame) else actual
         assert_frame_equal(actual, _panel())
         assert _feed(actual, spec).feature_metadata["spec"] == spec.to_dict()
+
+
+@pytest.mark.parametrize("unit", ["ms", "us", "ns"])
+@pytest.mark.parametrize("delay_ns", [0, 1])
+@pytest.mark.parametrize("append_future", [False, True])
+def test_prepared_feature_publication_keeps_nanosecond_causality_at_coarser_decision_clocks(
+    unit, delay_ns, append_future
+):
+    panel = _panel().with_columns(
+        pl.col("decision_time").cast(pl.Datetime(unit, "UTC")),
+        (
+            pl.col("decision_time").cast(pl.Datetime("ns", "UTC"))
+            + pl.duration(nanoseconds=delay_ns)
+        ).alias("available_at"),
+    )
+    if append_future:
+        future = panel.tail(2).with_columns(
+            pl.col("timestamp") + pl.duration(days=1),
+            (pl.col("decision_time") + pl.duration(days=1, time_unit="ns")).cast(
+                panel.schema["decision_time"]
+            ),
+            pl.col("available_at") + pl.duration(days=1, time_unit="ns"),
+            pl.lit(99999.0).alias("average"),
+        )
+        panel = pl.concat([panel, future])
+    runtime = RuntimeServices(end=_panel()["decision_time"].max())
+    seen = []
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            values = [(data.get(a, {}).get("signals") or {}).get("average") for a in ["A", "B"]]
+            current = runtime.signals.current(["A", "B"], ["average"])["average"].to_list()
+            assert current == values
+            seen.append(values)
+            if values[0] is not None:
+                broker.submit_order("A", 1)
+
+    # Original two decision observations only. A future appended panel must not change them.
+    feed = _feed(panel)
+    result = Engine(
+        feed,
+        Read(),
+        BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+        runtime=runtime,
+    ).run()
+    assert seen == ([[2.0, None], [3.0, None]] if delay_ns == 0 else [[None, None], [None, None]])
+    assert [f.price for f in result.fills] == ([100.0, 100.0] if delay_ns == 0 else [])

@@ -223,14 +223,21 @@ class MarketDataView:
         if cached is not None:
             return cached
         timestamp = pl.col(self._timestamp_col)
-        dtype = self._frame.schema[self._timestamp_col]
+        units = {"ms": 1_000_000, "us": 1_000, "ns": 1}
+        stamp_dtype = cast(pl.Datetime, self._frame.schema[self._timestamp_col])
+        observation_ns = timestamp.cast(pl.Int128) * units[stamp_dtype.time_unit]
         masks = []
         for field in sorted(fields):
             declaration = self._known_at_cols.get(field)
             hidden = (
                 timestamp.is_null()
                 if declaration is None
-                else pl.col(declaration).is_null() | (pl.col(declaration).cast(dtype) > timestamp)
+                else pl.col(declaration).is_null()
+                | (
+                    pl.col(declaration).cast(pl.Int128)
+                    * units[cast(pl.Datetime, self._frame.schema[declaration]).time_unit]
+                    > observation_ns
+                )
             )
             eligible = self._eligible_cols.get(field)
             if eligible is not None:
