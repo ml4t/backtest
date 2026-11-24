@@ -502,3 +502,70 @@ def test_trade_quote_bracket_profit_fills_valid_quote_and_cancels_stop(direction
     assert result.fills[-1].trigger_price == prices[2]
     assert engine.broker.get_position("TEST") is None
     assert engine.broker.cash == pytest.approx(100000 + 10 * 6 - 2)
+
+
+def test_trade_quote_pending_order_waits_across_another_assets_event():
+    times, _ = _feed([100.0] * 3, [100.0] * 3, [100.0] * 3, [100.0] * 3)
+    frame = pl.DataFrame(
+        {
+            "timestamp": times,
+            "asset": ["TEST", "OTHER", "TEST"],
+            "close": [100.0, 200.0, 106.0],
+            "bid": [99.0, 199.0, 105.0],
+            "ask": [101.0, 201.0, 107.0],
+        }
+    )
+
+    class Stop(Strategy):
+        def on_data(self, t, d, c, b):
+            if t == times[0]:
+                b.submit_order("TEST", 1, order_type=OrderType.STOP, stop_price=105.0)
+
+    result = Engine(
+        DataFeed(prices_df=frame, bid_col="bid", ask_col="ask"),
+        Stop(),
+        BacktestConfig(calendar=None, conditional_order_mode="trade_quote"),
+    ).run()
+    assert [(f.timestamp, f.price) for f in result.fills] == [(times[2], 107.0)]
+
+
+@pytest.mark.parametrize("direction", [1, -1])
+def test_clamped_limit_partial_remainder_cancellation_keeps_fees_and_volume_accounting(direction):
+    values = [100.0] * 4
+    times, feed = _feed(values, [102.0] * 4, [98.0] * 4, values, volumes=[10.0] * 4)
+
+    class Limit(Strategy):
+        def on_data(self, t, d, c, b):
+            if t == times[0]:
+                self.order = b.submit_order(
+                    "TEST", direction * 10, order_type=OrderType.LIMIT, limit_price=100 - direction
+                )
+            if t == times[2]:
+                assert b.cancel_order(self.order.order_id)
+
+    strategy = Limit()
+    engine = Engine(
+        feed,
+        strategy,
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_short_selling=True,
+            allow_leverage=True,
+            limit_slippage_policy="clamp",
+            slippage_type=SlippageType.FIXED,
+            slippage_fixed=0.5,
+            commission_type=CommissionType.PER_ORDER_PER_SHARE,
+            commission_per_share=0.1,
+            commission_minimum=1.0,
+        ),
+        execution_limits=VolumeParticipationLimit(max_participation=0.3),
+    )
+    result = engine.run()
+    assert [f.quantity for f in result.fills] == [3.0, 3.0]
+    assert [f.price for f in result.fills] == [100 - direction] * 2
+    assert [f.slippage for f in result.fills] == [0.0, 0.0]
+    assert sum(f.commission for f in result.fills) == 1.0
+    assert strategy.order.status is OrderStatus.CANCELLED
+    assert engine.broker.get_position("TEST").quantity == direction * 6
+    assert engine.broker.cash == pytest.approx(100000 - direction * 6 * (100 - direction) - 1)

@@ -253,6 +253,8 @@ class FillEngine:
             self.broker.conditional_order_mode is ConditionalOrderMode.TRADE_QUOTE
             and order.order_type in {OrderType.LIMIT, OrderType.STOP, OrderType.STOP_LIMIT}
         ):
+            if order.asset not in self.market.prices:
+                return None
             quote = self.market.asks if order.side is OrderSide.BUY else self.market.bids
             value = quote.get(order.asset)
             if value is None or not isfinite(value) or value <= 0:
