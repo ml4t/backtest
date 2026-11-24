@@ -16,7 +16,7 @@ from ml4t.backtest.models import NoCommission, NoSlippage
 
 
 def _make_broker(cash: float = 200_000.0) -> Broker:
-    return Broker(cash, NoCommission(), NoSlippage())
+    return Broker(cash, NoCommission(), NoSlippage(), allow_short_selling=True)
 
 
 def _set_bar(
@@ -46,7 +46,7 @@ def _set_bar(
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     limit=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     bar_high=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -66,11 +66,12 @@ def test_limit_buy_never_fills_above_limit(limit: float, bar_high: float, bar_lo
     broker._process_orders()
 
     limit_fills = [f for f in broker.fills if f.order_type == "limit"]
+    assert len(limit_fills) == int(bar_low <= limit)
     for fill in limit_fills:
         assert fill.price <= limit + 1e-8, f"Limit BUY filled at {fill.price} > limit {limit}"
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     limit=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     bar_high=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -90,6 +91,7 @@ def test_limit_sell_never_fills_below_limit(limit: float, bar_high: float, bar_l
     broker._process_orders()
 
     limit_fills = [f for f in broker.fills if f.order_type == "limit"]
+    assert len(limit_fills) == int(bar_high >= limit)
     for fill in limit_fills:
         assert fill.price >= limit - 1e-8, f"Limit SELL filled at {fill.price} < limit {limit}"
 
@@ -99,7 +101,7 @@ def test_limit_sell_never_fills_below_limit(limit: float, bar_high: float, bar_l
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     stop=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
     bar_open=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -121,11 +123,12 @@ def test_stop_buy_never_fills_below_stop(
     broker._process_orders()
 
     stop_fills = [f for f in broker.fills if f.order_type == "stop"]
+    assert len(stop_fills) == int(bar_high >= stop)
     for fill in stop_fills:
         assert fill.price >= stop - 1e-8, f"Stop BUY filled at {fill.price} < stop {stop}"
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 @given(
     stop=st.floats(min_value=10.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     bar_open=st.floats(min_value=10.0, max_value=200.0, allow_nan=False, allow_infinity=False),
@@ -147,6 +150,7 @@ def test_stop_sell_never_fills_above_stop(
     broker._process_orders()
 
     stop_fills = [f for f in broker.fills if f.order_type == "stop"]
+    assert len(stop_fills) == int(bar_low <= stop)
     for fill in stop_fills:
         assert fill.price <= stop + 1e-8, f"Stop SELL filled at {fill.price} > stop {stop}"
 
@@ -156,7 +160,7 @@ def test_stop_sell_never_fills_above_stop(
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 @given(
     entry_price=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
     tp_offset=st.floats(min_value=1.0, max_value=20.0, allow_nan=False, allow_infinity=False),
@@ -189,12 +193,7 @@ def test_bracket_exactly_one_exit(
     entry, tp, sl = orders
     broker._process_orders()
 
-    if entry.status != broker.__class__.__dict__.get("_x", None):
-        # Entry should have filled (market order at current price)
-        pass
-
-    if entry.filled_price is None:
-        return  # Entry didn't fill (shouldn't happen with market)
+    assert entry.filled_price is not None
 
     # Bar 1: exit bar with random high/low
     exit_close = (exit_high + exit_low) / 2
@@ -206,6 +205,7 @@ def test_bracket_exactly_one_exit(
     tp_filled = tp.status.value == "filled"
     sl_filled = sl.status.value == "filled"
 
+    assert (tp_filled or sl_filled) == (exit_high >= tp_price or exit_low <= sl_price)
     if tp_filled or sl_filled:
         # Exactly one should have filled, not both
         assert not (tp_filled and sl_filled), (
