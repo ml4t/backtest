@@ -28,6 +28,9 @@
 - Provide optional native Nautilus and pysystemtrade comparison workflows on frozen historical
   inputs, including ETF and FX strategies, perpetual funding, and dated futures execution and
   accounting. Keep each comparison's reference build and execution assumptions explicit.
+- Offer opt-in limit slippage capping and synchronized trade-triggered opposite-quote conditional
+  fills. Preserve default limit deferral, final price bounds, partial-fill accounting and original
+  trigger provenance in saved results.
 
 ### Build and documentation
 
