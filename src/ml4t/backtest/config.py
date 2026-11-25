@@ -234,6 +234,14 @@ class ConditionalOrderMode(str, Enum):
 
     BAR_OHLC = "bar_ohlc"
     EXECUTION_PRICE = "execution_price"
+    TRADE_QUOTE = "trade_quote"
+
+
+class LimitSlippagePolicy(str, Enum):
+    """Handling of execution costs that would violate a conditional limit."""
+
+    DEFER = "defer"
+    CLAMP = "clamp"
 
 
 class CancelPolicy(str, Enum):
@@ -560,6 +568,9 @@ class BacktestConfig:
     conditional_order_mode: ConditionalOrderMode = field(
         default=ConditionalOrderMode.BAR_OHLC, kw_only=True
     )
+    limit_slippage_policy: LimitSlippagePolicy = field(
+        default=LimitSlippagePolicy.DEFER, kw_only=True
+    )
     execution_mode: ExecutionMode = ExecutionMode.NEXT_BAR  # Order execution timing
 
     # === Stop Configuration ===
@@ -839,6 +850,7 @@ class BacktestConfig:
             raise ValueError("corporate_action_policy must be declared_terms or zipline_3_2")
         self.cancel_policy = CancelPolicy(self.cancel_policy)
         self.conditional_order_mode = ConditionalOrderMode(self.conditional_order_mode)
+        self.limit_slippage_policy = LimitSlippagePolicy(self.limit_slippage_policy)
         if self.next_bar_execution_price is not None:
             self.next_bar_execution_price = ExecutionPrice(self.next_bar_execution_price)
         FeedSpec(time_contract_version=self.time_contract_version, calendar=self.calendar)
@@ -1022,6 +1034,7 @@ class BacktestConfig:
                 "cancel_policy": self.cancel_policy.value,
                 "corporate_action_policy": self.corporate_action_policy,
                 "conditional_order_mode": self.conditional_order_mode.value,
+                "limit_slippage_policy": self.limit_slippage_policy.value,
                 "next_bar_execution_price": (
                     self.next_bar_execution_price.value
                     if self.next_bar_execution_price is not None
@@ -1151,6 +1164,7 @@ class BacktestConfig:
                     "cancel_policy",
                     "corporate_action_policy",
                     "conditional_order_mode",
+                    "limit_slippage_policy",
                 },
                 "stops": {
                     "stop_fill_mode",
@@ -1296,6 +1310,7 @@ class BacktestConfig:
             cancel_policy=exec_cfg.get("cancel_policy", "never"),
             corporate_action_policy=exec_cfg.get("corporate_action_policy", "declared_terms"),
             conditional_order_mode=exec_cfg.get("conditional_order_mode", "bar_ohlc"),
+            limit_slippage_policy=exec_cfg.get("limit_slippage_policy", "defer"),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),

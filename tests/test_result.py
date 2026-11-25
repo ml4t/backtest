@@ -344,6 +344,7 @@ class TestBacktestResultFillsDataFrame:
             "limit_price",
             "stop_price",
             "stop_triggered_at",
+            "trigger_price",
             "price_source",
             "reference_price",
             "quote_mid_price",
@@ -357,6 +358,7 @@ class TestBacktestResultFillsDataFrame:
             "exit_reason_detail",
         ]
         assert df["rebalance_id"].to_list() == ["rebalance-1", "rebalance-1"]
+        assert df["trigger_price"].to_list() == [None, None]
 
     def test_fills_dataframe_empty(self):
         result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
