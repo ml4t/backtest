@@ -247,8 +247,8 @@ Returns a Polars DataFrame with columns:
 | `bars_held` | Int | Holding period |
 | `fees` | Float | Total commission |
 | `exit_slippage` | Float | Exit slippage |
-| `mfe` | Float | Maximum favorable excursion |
-| `mae` | Float | Maximum adverse excursion |
+| `mfe` | Float | Maximum favorable signed price return, including the exit fill for realized quantities |
+| `mae` | Float | Minimum signed price return, including the exit fill for realized quantities |
 | `entry_slippage` | Float | Per-unit slippage on entry |
 | `multiplier` | Float | Contract multiplier (futures) |
 | `entry_quote_mid_price` | Float | Entry quote midpoint |

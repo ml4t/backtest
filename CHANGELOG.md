@@ -2,6 +2,13 @@
 
 <!-- Generated from release/changelog.json. Do not edit managed entries. -->
 
+## 0.2.2 - Unreleased
+
+### Fixed
+
+- Include the executed exit price in favorable and adverse excursion bounds for the realized
+  quantity on closes, partial closes and reversals.
+
 ## 0.2.1 - Unreleased
 
 ### Fixed
