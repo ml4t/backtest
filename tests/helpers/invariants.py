@@ -187,13 +187,11 @@ def _check_direction_signs(closed_trades: list) -> None:
 
 
 def _check_mfe_mae_bounds(closed_trades: list) -> None:
-    """Verify: MFE >= 0, MAE <= 0.
-
-    Note: pnl_percent is NOT guaranteed to be bounded by MFE/MAE because
-    water marks are updated at bar end AFTER position exits. The exit bar's
-    price move is not captured in MFE/MAE if the position closes on that bar.
-    """
+    """Realized trade excursions include both the entry and the exit return."""
     for i, t in enumerate(closed_trades):
+        assert t.mae <= t.pnl_percent <= t.mfe, (
+            f"Trade {i} ({t.symbol}) return {t.pnl_percent} outside [{t.mae}, {t.mfe}]"
+        )
         assert t.mfe >= -_REL_TOL, (
             f"MFE bound violated for trade {i} ({t.symbol}): mfe={t.mfe:.6f} < 0"
         )

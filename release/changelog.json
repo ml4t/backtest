@@ -2,6 +2,15 @@
   "legacy_start": "0.1.0b17",
   "releases": [
     {
+      "version": "0.2.2",
+      "date": "Unreleased",
+      "sections": {
+        "Fixed": [
+          "Include the executed exit price in favorable and adverse excursion bounds for the realized quantity on closes, partial closes and reversals."
+        ]
+      }
+    },
+    {
       "version": "0.2.1",
       "date": "Unreleased",
       "sections": {
